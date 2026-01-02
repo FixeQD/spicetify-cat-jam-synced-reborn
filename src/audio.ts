@@ -12,20 +12,46 @@ export function setAudioData(data: any) {
     audioData = data;
 }
 
+export async function getDynamicAnalysis(progressMs: number) {
+    if (!audioData) return { playbackRate: 1, loudness: 0.5 };
+
+    const { getLocalBPM, getLoudnessAt, normalizeLoudness } = await import("./analyzer");
+    const progressSec = progressMs / 1000;
+    const videoDefaultBPM = cachedSettings.bpm;
+
+    const localBPM = getLocalBPM(audioData.beats, progressSec) || audioData.track?.tempo || videoDefaultBPM;
+    const loudness = normalizeLoudness(getLoudnessAt(audioData.segments, progressSec));
+
+    const playbackRate = localBPM / videoDefaultBPM;
+
+    return { playbackRate, loudness, bpm: localBPM };
+}
+
 export async function fetchAudioData(retryDelay: number = APP_CONFIG.DEFAULTS.RETRY_DELAY, maxRetries: number = APP_CONFIG.DEFAULTS.MAX_RETRIES): Promise<any> {
+    const uri = Spicetify.Player.data?.item?.uri;
+    if (!uri) return null;
+
     try {
-        const data = await Spicetify.getAudioData();
+        const id = uri.split(":")[2];
+        const url = `https://spclient.wg.spotify.com/audio-attributes/v1/audio-analysis/${id}?format=json`;
+        const data = await Spicetify.CosmosAsync.get(url);
+        
         setAudioData(data);
         return data;
     } catch (error) {
-        if (typeof error === "object" && error !== null && 'message' in (error as any)) {
-            if ((error as any).message.includes("Cannot read properties of undefined") && maxRetries > 0) {
+        console.warn(`[CAT-JAM] Error fetching detailed analysis: ${error}`);
+        // Fallback to basic audio data if detailed fails
+        try {
+            const data = await Spicetify.getAudioData();
+            setAudioData(data);
+            return data;
+        } catch (innerError) {
+            if (maxRetries > 0) {
                 await new Promise(resolve => setTimeout(resolve, retryDelay));
                 return fetchAudioData(retryDelay, maxRetries - 1);
             }
+            return null;
         }
-        console.warn(`[CAT-JAM] Error fetching audio data: ${error}`);
-        return null;
     }
 }
 

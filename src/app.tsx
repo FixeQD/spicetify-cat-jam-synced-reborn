@@ -1,6 +1,6 @@
 import { APP_CONFIG } from "./config";
 import { settings, SETTINGS_SCHEMA } from "./settings";
-import { fetchAudioData, getPlaybackRate } from "./audio";
+import { fetchAudioData, getPlaybackRate, getDynamicAnalysis } from "./audio";
 import { createWebMVideo, syncTiming, getVideoElement } from "./video";
 
 async function main() {
@@ -30,10 +30,17 @@ async function main() {
     });
     
     let lastProgress = 0;
-    Spicetify.Player.addEventListener("onprogress", () => {
+    Spicetify.Player.addEventListener("onprogress", async () => {
         const progress = Spicetify.Player.getProgress();
         if (Math.abs(progress - lastProgress) >= APP_CONFIG.DEFAULTS.PROGRESS_THRESHOLD) {
             syncTiming(performance.now(), progress);
+
+            // Dynamic analysis update
+            const videoElement = getVideoElement();
+            if (videoElement) {
+                const { playbackRate } = await getDynamicAnalysis(progress);
+                videoElement.playbackRate = playbackRate;
+            }
         }
         lastProgress = progress;
     });
