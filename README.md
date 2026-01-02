@@ -35,4 +35,6 @@ To watch for changes and rebuild automatically:
 bun run watch
 ```
 
+---
+
 That's it! Now go forth and jam - just try not to let the cat out-vibe you. 🐾🎵
