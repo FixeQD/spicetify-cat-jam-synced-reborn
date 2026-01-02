@@ -4,6 +4,7 @@ import { fetchAudioData, getPlaybackRate } from "./audio";
 import { createWebMVideo, syncTiming, getVideoElement } from "./video";
 
 async function main() {
+    console.log("[CAT-JAM] Extension initializing...");
     while (!Spicetify?.Player?.addEventListener || !Spicetify?.getAudioData) {
         await new Promise(resolve => setTimeout(resolve, APP_CONFIG.DEFAULTS.SYNC_INTERVAL));
     }
@@ -57,3 +58,4 @@ async function main() {
 }
 
 export default main;
+main();
