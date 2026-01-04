@@ -30,6 +30,7 @@ async function main() {
 	const updateLoop = async () => {
 		if (!Spicetify.Player.isPlaying()) {
 			animationId = null
+			getVideoElement()?.pause()
 			return
 		}
 
