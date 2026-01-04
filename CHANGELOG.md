@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+### v2.2.1 🐱
+
+- **Smooth Rate Changes**: Lerp-based rate transitions prevent stuttering on rapid beat sequences.
+- **Startup Fix**: Cat no longer vibes to silence when Spotify starts - waits for music to actually play.
+
 ### v2.2.0 (Cat Has More IQ) 🧠🐱
 
 - **Head Drop Timestamps**: Mapped 20 precise timestamps of when the cat drops its head in the animation.

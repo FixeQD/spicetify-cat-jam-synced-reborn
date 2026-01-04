@@ -4,6 +4,7 @@ import { getAudioData, fetchAudioData } from './audio'
 
 let videoElement: HTMLVideoElement | null = null
 let lastSyncBeatIndex = -1
+let currentRate = 1
 
 export function getVideoElement() {
 	return videoElement
@@ -31,6 +32,11 @@ function getNextBeat(progressSec: number, beats: any[]): { index: number; time: 
 	return null
 }
 
+// lerp towards target rate - smooths out sudden changes
+function lerp(current: number, target: number, factor: number): number {
+	return current + (target - current) * factor
+}
+
 function calculateSmoothPlaybackRate(progressMs: number): number {
 	if (!videoElement) return 1
 
@@ -47,7 +53,8 @@ function calculateSmoothPlaybackRate(progressMs: number): number {
 	const nextDrop = getNextHeadDrop(currentVideoTime)
 
 	const timeUntilBeat = nextBeat.time - progressSec
-	if (timeUntilBeat <= 0.01) return 1 // too close, don't mess with it
+	// if beat is too close, just coast at current rate
+	if (timeUntilBeat <= 0.05) return currentRate
 
 	let timeUntilDrop = nextDrop.time - currentVideoTime
 	if (timeUntilDrop <= 0) {
@@ -55,9 +62,13 @@ function calculateSmoothPlaybackRate(progressMs: number): number {
 	}
 
 	// playback rate = video_distance / music_distance
-	const rate = timeUntilDrop / timeUntilBeat
+	const targetRate = timeUntilDrop / timeUntilBeat
+	const clampedTarget = Math.max(0.7, Math.min(1.5, targetRate))
 
-	return Math.max(0.5, Math.min(2.0, rate))
+	// smooth transition - don't jump rates instantly
+	currentRate = lerp(currentRate, clampedTarget, 0.15)
+
+	return currentRate
 }
 
 // only jumps currentTime on big desync (pause/seek/song change)
@@ -194,7 +205,7 @@ export async function createWebMVideo() {
 
 		videoElement = document.createElement('video')
 		videoElement.loop = true
-		videoElement.autoplay = true
+		videoElement.autoplay = false
 		videoElement.muted = true
 		videoElement.style.cssText = elementStyles
 		videoElement.src = videoURL
@@ -202,6 +213,7 @@ export async function createWebMVideo() {
 
 		await fetchAudioData()
 		videoElement.playbackRate = 1
+		currentRate = 1
 
 		if (targetElement.firstChild) {
 			targetElement.insertBefore(videoElement, targetElement.firstChild)
@@ -211,6 +223,7 @@ export async function createWebMVideo() {
 
 		// reset sync state
 		lastSyncBeatIndex = -1
+		currentRate = 1
 
 		if (Spicetify.Player.isPlaying()) {
 			videoElement.play()
