@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+### v2.2.0 (Cat Has More IQ) 🧠🐱
+
+- **Head Drop Timestamps**: Mapped 20 precise timestamps of when the cat drops its head in the animation.
+- **Smart Sync**: Dynamic `playbackRate` adjusts so the next head drop lands exactly on the next music beat.
+- **Better Rhythm Feel**: Cat actually vibes with the beat now instead of approximating with constant BPM.
+- **Pause Sync**: Cat pauses when music pauses. No more jamming to silence.
+
 ### v2.1.0 (Real-time Analysis Update) 🐾⚡
 
 - **High-Precision Sync**: Switched to detailed sub-millisecond audio analysis (jk, just getting it from Spotify's internal endpoints) for better rhythm accuracy.
