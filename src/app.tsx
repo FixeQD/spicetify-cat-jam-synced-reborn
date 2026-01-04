@@ -1,7 +1,7 @@
 import { APP_CONFIG } from './config'
 import { settings, SETTINGS_SCHEMA } from './settings'
 import { fetchAudioData, getPlaybackRate, getDynamicAnalysis } from './audio'
-import { createWebMVideo, syncTiming, getVideoElement } from './video'
+import { createWebMVideo, syncTiming, getVideoElement, syncVideoToMusicBeat } from './video'
 
 async function main() {
 	console.log('[CAT-JAM] Extension initializing...')
@@ -26,7 +26,6 @@ async function main() {
 	await createWebMVideo()
 
 	let animationId: number | null = null
-	let lastUpdate = 0
 
 	const updateLoop = async () => {
 		if (!Spicetify.Player.isPlaying()) {
@@ -34,14 +33,14 @@ async function main() {
 			return
 		}
 
-		const now = performance.now()
 		const progress = Spicetify.Player.getProgress()
 
-		const { playbackRate, loudness } = getDynamicAnalysis(progress)
+		syncVideoToMusicBeat(progress)
+
+		const { loudness } = getDynamicAnalysis(progress)
 		const videoElement = getVideoElement()
 
 		if (videoElement) {
-			videoElement.playbackRate = playbackRate
 			const scale = 1 + loudness * (APP_CONFIG.VISUAL.MAX_SCALE - 1)
 			videoElement.style.transform = `scale(${scale})`
 		}
@@ -77,7 +76,7 @@ async function main() {
 		const startTime = performance.now()
 		const audioData = await fetchAudioData()
 
-		videoElement.playbackRate = await getPlaybackRate(audioData)
+		videoElement.playbackRate = 1
 
 		if (audioData?.beats?.length) {
 			const firstBeatStart = audioData.beats[0].start

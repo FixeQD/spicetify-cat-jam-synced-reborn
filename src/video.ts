@@ -1,17 +1,139 @@
 import { APP_CONFIG } from './config'
 import { cachedSettings } from './settings'
-import { getAudioData, fetchAudioData, getPlaybackRate } from './audio'
+import { getAudioData, fetchAudioData } from './audio'
 
 let videoElement: HTMLVideoElement | null = null
+let lastSyncBeatIndex = -1
 
 export function getVideoElement() {
 	return videoElement
+}
+
+function getNextHeadDrop(currentVideoTime: number): { index: number; time: number } {
+	const drops = APP_CONFIG.CAT_HEAD_DROPS
+	const videoDuration = APP_CONFIG.VIDEO_DURATION
+
+	for (let i = 0; i < drops.length; i++) {
+		if (drops[i] > currentVideoTime) {
+			return { index: i, time: drops[i] }
+		}
+	}
+	// wrapped around - next drop is first one
+	return { index: 0, time: drops[0] + videoDuration }
+}
+
+function getNextBeat(progressSec: number, beats: any[]): { index: number; time: number } | null {
+	for (let i = 0; i < beats.length; i++) {
+		if (beats[i].start > progressSec) {
+			return { index: i, time: beats[i].start }
+		}
+	}
+	return null
+}
+
+function calculateSmoothPlaybackRate(progressMs: number): number {
+	if (!videoElement) return 1
+
+	const audioData = getAudioData()
+	if (!audioData?.beats?.length) return 1
+
+	const progressSec = progressMs / 1000
+	const currentVideoTime = videoElement.currentTime
+	const videoDuration = APP_CONFIG.VIDEO_DURATION
+
+	const nextBeat = getNextBeat(progressSec, audioData.beats)
+	if (!nextBeat) return 1
+
+	const nextDrop = getNextHeadDrop(currentVideoTime)
+
+	const timeUntilBeat = nextBeat.time - progressSec
+	if (timeUntilBeat <= 0.01) return 1 // too close, don't mess with it
+
+	let timeUntilDrop = nextDrop.time - currentVideoTime
+	if (timeUntilDrop <= 0) {
+		timeUntilDrop += videoDuration
+	}
+
+	// playback rate = video_distance / music_distance
+	const rate = timeUntilDrop / timeUntilBeat
+
+	return Math.max(0.5, Math.min(2.0, rate))
+}
+
+// only jumps currentTime on big desync (pause/seek/song change)
+function correctBigDrift(progressMs: number) {
+	if (!videoElement) return
+
+	const audioData = getAudioData()
+	if (!audioData?.beats?.length) return
+
+	const progressSec = progressMs / 1000
+	const drops = APP_CONFIG.CAT_HEAD_DROPS
+	const videoDuration = APP_CONFIG.VIDEO_DURATION
+
+	let currentBeatIndex = 0
+	for (let i = 0; i < audioData.beats.length; i++) {
+		if (audioData.beats[i].start <= progressSec) {
+			currentBeatIndex = i
+		} else {
+			break
+		}
+	}
+
+	// only correct once per beat transition
+	if (currentBeatIndex === lastSyncBeatIndex) return
+	lastSyncBeatIndex = currentBeatIndex
+
+	const currentBeat = audioData.beats[currentBeatIndex]
+	const nextBeat = audioData.beats[currentBeatIndex + 1]
+	if (!currentBeat || !nextBeat) return
+
+	const beatDuration = nextBeat.start - currentBeat.start
+	const timeSinceBeat = progressSec - currentBeat.start
+	const beatProgress = Math.min(1, timeSinceBeat / beatDuration)
+
+	// where should video be?
+	const dropIndex = currentBeatIndex % drops.length
+	const currentDrop = drops[dropIndex]
+	const nextDrop = drops[(dropIndex + 1) % drops.length]
+
+	let dropDuration: number
+	if (nextDrop > currentDrop) {
+		dropDuration = nextDrop - currentDrop
+	} else {
+		dropDuration = videoDuration - currentDrop + nextDrop
+	}
+
+	let expectedTime = currentDrop + beatProgress * dropDuration
+	if (expectedTime >= videoDuration) {
+		expectedTime -= videoDuration
+	}
+
+	const drift = Math.abs(videoElement.currentTime - expectedTime)
+	const wrappedDrift = Math.min(drift, videoDuration - drift)
+
+	if (wrappedDrift > 0.3) {
+		videoElement.currentTime = expectedTime
+	}
+}
+
+export function syncVideoToMusicBeat(progressMs: number) {
+	if (!videoElement) return
+
+	correctBigDrift(progressMs)
+
+	const rate = calculateSmoothPlaybackRate(progressMs)
+	videoElement.playbackRate = rate
 }
 
 export function syncTiming(startTime: number, progress: number) {
 	if (!videoElement) return
 
 	if (Spicetify.Player.isPlaying()) {
+		// reset sync tracking on manual sync
+		lastSyncBeatIndex = -1
+		correctBigDrift(progress)
+
 		const progressInSeconds = progress / 1000
 		const audioData = getAudioData()
 
@@ -78,14 +200,17 @@ export async function createWebMVideo() {
 		videoElement.src = videoURL
 		videoElement.id = APP_CONFIG.SELECTORS.CAT_JAM_ID
 
-		const audioData = await fetchAudioData()
-		videoElement.playbackRate = await getPlaybackRate(audioData)
+		await fetchAudioData()
+		videoElement.playbackRate = 1
 
 		if (targetElement.firstChild) {
 			targetElement.insertBefore(videoElement, targetElement.firstChild)
 		} else {
 			targetElement.appendChild(videoElement)
 		}
+
+		// reset sync state
+		lastSyncBeatIndex = -1
 
 		if (Spicetify.Player.isPlaying()) {
 			videoElement.play()
