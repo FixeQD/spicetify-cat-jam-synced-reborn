@@ -15,7 +15,7 @@ jobs:
         steps:
             - uses: actions/checkout@v4
               with:
-                  fetch-depth: 2 # Need historical context to compare versions
+                  fetch-depth: 0 # Need to fetch all branches for switching to marketplace
 
             - name: Check version change
               id: check
@@ -55,11 +55,17 @@ jobs:
               run: |
                   git config user.name "github-actions[bot]"
                   git config user.email "github-actions[bot]@users.noreply.github.com"
-                  git add dist/cat-jam.js
-                  # Only commit if dist actually changed
+                  if git show-ref --verify --quiet refs/heads/marketplace; then
+                      git checkout marketplace
+                  else
+                      git checkout --orphan marketplace
+                  fi
+                  cp dist/cat-jam.js cat-jam.js
+                  git add cat-jam.js
+                  # Only commit if cat-jam.js actually changed
                   if ! git diff --staged --quiet; then
                     git commit -m "build: automatic extension bundle update (v$(jq -r .version package.json))"
-                    git push
+                    git push origin marketplace
                   else
-                    echo "No changes in dist/cat-jam.js to commit."
+                    echo "No changes in cat-jam.js to commit."
                   fi

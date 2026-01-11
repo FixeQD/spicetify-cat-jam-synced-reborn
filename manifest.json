@@ -5,6 +5,7 @@
 		"preview": "assets/preview.gif",
 		"main": "dist/cat-jam.js",
 		"readme": "README.md",
+		"branch": "marketplace",
 		"authors": [
 			{ "name": "BlafKing", "url": "https://github.com/BlafKing" },
 			{ "name": "FixeQ", "url": "https://github.com/FixeQD" }
