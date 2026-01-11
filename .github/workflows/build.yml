@@ -60,6 +60,7 @@ jobs:
                   else
                       git checkout --orphan marketplace
                   fi
+                  git pull origin marketplace
                   cp dist/cat-jam.js cat-jam.js
                   git add cat-jam.js
                   # Only commit if cat-jam.js actually changed
