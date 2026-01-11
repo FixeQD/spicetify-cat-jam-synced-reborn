@@ -53,12 +53,16 @@ jobs:
             - name: Commit and push changes
               if: steps.check.outputs.changed == 'true'
               run: |
+                  VERSION=$(jq -r .version package.json)
                   git config user.name "github-actions[bot]"
                   git config user.email "github-actions[bot]@users.noreply.github.com"
+                  IS_ORPHAN=0
                   if git show-ref --verify --quiet refs/heads/marketplace; then
+                      IS_ORPHAN=0
                       git checkout marketplace
                       git pull origin marketplace
                   else
+                      IS_ORPHAN=1
                       git checkout --orphan marketplace
                       git rm -rf .
                   fi
@@ -66,8 +70,12 @@ jobs:
                   git add cat-jam.js
                   # Only commit if cat-jam.js actually changed
                   if ! git diff --staged --quiet; then
-                    git commit -m "build: automatic extension bundle update (v$(jq -r .version package.json))"
-                    git push origin marketplace
+                    git commit -m "build: automatic extension bundle update (v$VERSION)"
+                    if [ "$IS_ORPHAN" -eq 1 ]; then
+                      git push --force origin marketplace
+                    else
+                      git push origin marketplace
+                    fi
                   else
                     echo "No changes in cat-jam.js to commit."
                   fi
