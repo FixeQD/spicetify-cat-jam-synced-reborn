@@ -57,10 +57,11 @@ jobs:
                   git config user.email "github-actions[bot]@users.noreply.github.com"
                   if git show-ref --verify --quiet refs/heads/marketplace; then
                       git checkout marketplace
+                      git pull origin marketplace
                   else
                       git checkout --orphan marketplace
+                      git rm -rf .
                   fi
-                  git pull origin marketplace
                   cp dist/cat-jam.js cat-jam.js
                   git add cat-jam.js
                   # Only commit if cat-jam.js actually changed
