@@ -2,10 +2,9 @@
 	{
 		"name": "Cat-Jam Synced (Reborn)",
 		"description": "A reborn and optimized Cat-Jam experience, perfectly in sync with your beat.",
-		"preview": "preview.gif",
-		"main": "cat-jam.js",
+		"preview": "assets/preview.gif",
+		"main": "dist/cat-jam.js",
 		"readme": "README.md",
-		"branch": "marketplace",
 		"authors": [
 			{ "name": "BlafKing", "url": "https://github.com/BlafKing" },
 			{ "name": "FixeQ", "url": "https://github.com/FixeQD" }
