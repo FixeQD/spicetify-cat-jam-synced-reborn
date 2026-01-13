@@ -63,10 +63,16 @@ function calculateSmoothPlaybackRate(progressMs: number): number {
 
 	// playback rate = video_distance / music_distance
 	const targetRate = timeUntilDrop / timeUntilBeat
-	const clampedTarget = Math.max(0.7, Math.min(1.5, targetRate))
+	const clampedTarget = Math.max(0.85, Math.min(1.3, targetRate))
 
 	// smooth transition - don't jump rates instantly
-	currentRate = lerp(currentRate, clampedTarget, 0.15)
+	currentRate = lerp(currentRate, clampedTarget, 0.08)
+
+	// limit max change per frame to prevent jumps
+	const maxDelta = 0.02
+	if (Math.abs(currentRate - clampedTarget) > maxDelta) {
+		return currentRate
+	}
 
 	return currentRate
 }
@@ -125,6 +131,7 @@ function correctBigDrift(progressMs: number) {
 
 	if (wrappedDrift > 0.3) {
 		videoElement.currentTime = expectedTime
+		currentRate = 1
 	}
 }
 
