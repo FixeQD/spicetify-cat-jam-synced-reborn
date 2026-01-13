@@ -201,6 +201,7 @@ async function waitForElement(
 export async function createWebMVideo() {
 	try {
 		const isBottom = cachedSettings.position === APP_CONFIG.LABELS.POSITION.BOTTOM
+		const videoDuration = APP_CONFIG.VIDEO_DURATION
 
 		const leftLibraryStyle = `width: ${cachedSettings.size}%; max-width: ${APP_CONFIG.STYLES.MAX_LIBRARY_WIDTH}; height: auto; max-height: 100%; position: absolute; bottom: 0; pointer-events: none; z-index: 1;`
 
@@ -213,17 +214,40 @@ export async function createWebMVideo() {
 
 		if (videoElement) {
 			videoElement.remove()
+			const oldVideo = document.getElementById(APP_CONFIG.SELECTORS.CAT_JAM_ID)
+			if (oldVideo) {
+				oldVideo.remove()
+			}
 		}
 
 		const videoURL = cachedSettings.link || APP_CONFIG.DEFAULTS.VIDEO_URL
 
 		videoElement = document.createElement('video')
-		videoElement.loop = true
+		videoElement.loop = false
 		videoElement.autoplay = false
 		videoElement.muted = true
 		videoElement.style.cssText = elementStyles
 		videoElement.src = videoURL
 		videoElement.id = APP_CONFIG.SELECTORS.CAT_JAM_ID
+
+		const loopThreshold = videoDuration - 0.15
+
+		const handleTimeUpdate = () => {
+			if (!videoElement) return
+			if (videoElement.currentTime >= loopThreshold) {
+				videoElement.currentTime = 0
+			}
+		}
+
+		const handleEnded = () => {
+			if (videoElement) {
+				videoElement.currentTime = 0
+				videoElement.play()
+			}
+		}
+
+		videoElement.addEventListener('timeupdate', handleTimeUpdate)
+		videoElement.addEventListener('ended', handleEnded)
 
 		await fetchAudioData()
 		videoElement.playbackRate = 1

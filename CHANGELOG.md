@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+### v2.2.4 (Smooth Loop) 🔄✨
+
+- **Fixed Video Loop Jank**: Replaced native HTML5 loop with custom threshold-based reset to eliminate stuttering at loop boundaries.
+- **Seamless Playback**: Video now resets 0.15s before end, avoiding harsh seek operations that caused visible glitches.
+
 ### v2.2.3 (Always Upright) 🐱📐
 
 - **Fixed Head Flip Bug**: Worker now correctly calculates head drops based on actual beat progress instead of hardcoded offset.
