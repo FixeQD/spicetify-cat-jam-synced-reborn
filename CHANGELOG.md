@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+### v2.2.2 (No More UI Lag) ⚡🧵
+
+- **Web Worker Audio Processing**: Moved all heavy audio calculations to a separate thread to prevent UI freezing.
+- **Smoothed Playback Rate Limits**: Adjusted rate clamping to 0.85-1.3 and max change delta of 0.02 per frame for buttery smooth transitions.
+- **Drift Correction Fix**: Reset playback rate to 1 on big drift corrections to prevent jarring jumps.
+
 ### v2.2.1 🐱
 
 - **Smooth Rate Changes**: Lerp-based rate transitions prevent stuttering on rapid beat sequences.
