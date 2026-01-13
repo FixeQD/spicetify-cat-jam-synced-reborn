@@ -40,6 +40,7 @@ async function main() {
 					const CAT_HEAD_DROPS = APP_CONFIG.CAT_HEAD_DROPS
 					const VIDEO_DURATION = APP_CONFIG.VIDEO_DURATION
 					let currentRate = 1
+					let currentBeatIndex = -1
 
 					self.onmessage = (e: MessageEvent) => {
 						const { type, data } = e.data
@@ -51,13 +52,14 @@ async function main() {
 
 						if (type === 'resetRate') {
 							currentRate = 1
+							currentBeatIndex = -1
 						}
 					}
 
 					function processAudioData(progressMs: number, audioData: any) {
 						const progressSec = progressMs / 1000
 
-						const playbackRate = calculateSmoothPlaybackRate(progressMs, audioData)
+						const playbackRate = calculateSmoothPlaybackRate(progressSec, audioData)
 
 						const loudness = getLoudnessAt(audioData.segments, progressSec)
 						const normalizedLoudness = Math.max(0, Math.min(1, (loudness + 60) / 60))
@@ -107,24 +109,46 @@ async function main() {
 					}
 
 					function calculateSmoothPlaybackRate(
-						progressMs: number,
+						progressSec: number,
 						audioData: any
 					): number {
 						if (!audioData?.beats?.length) return 1
 
-						const progressSec = progressMs / 1000
+						let beatIndex = -1
+						for (let i = 0; i < audioData.beats.length; i++) {
+							if (audioData.beats[i].start <= progressSec) {
+								beatIndex = i
+							} else {
+								break
+							}
+						}
+
+						if (beatIndex !== currentBeatIndex) {
+							currentBeatIndex = beatIndex
+						}
 
 						const nextBeat = getNextBeat(progressSec, audioData.beats)
 						if (!nextBeat) return 1
 
+						const dropIndex = nextBeat.index % CAT_HEAD_DROPS.length
+						const currentDrop = CAT_HEAD_DROPS[dropIndex]
+						const nextDrop = CAT_HEAD_DROPS[(dropIndex + 1) % CAT_HEAD_DROPS.length]
+
+						let dropDuration: number
+						if (nextDrop > currentDrop) {
+							dropDuration = nextDrop - currentDrop
+						} else {
+							dropDuration = VIDEO_DURATION - currentDrop + nextDrop
+						}
+
 						const timeUntilBeat = nextBeat.time - progressSec
 						if (timeUntilBeat <= 0.05) return currentRate
 
-						const nextDrop = getNextHeadDrop(0)
-						let timeUntilDrop = nextDrop.time
-						if (timeUntilDrop <= 0) {
-							timeUntilDrop += VIDEO_DURATION
-						}
+						const timeUntilDrop =
+							dropDuration *
+							(timeUntilBeat /
+								(audioData.beats[nextBeat.index].start -
+									audioData.beats[beatIndex].start))
 
 						const targetRate = timeUntilDrop / timeUntilBeat
 						const clampedTarget = Math.max(0.85, Math.min(1.3, targetRate))

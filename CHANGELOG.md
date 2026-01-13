@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+### v2.2.3 (Always Upright) 🐱📐
+
+- **Fixed Head Flip Bug**: Worker now correctly calculates head drops based on actual beat progress instead of hardcoded offset.
+- **Gradual Sync Fixes**: Moderate drift corrections now use gentle playback rate adjustments instead of abrupt time jumps.
+- **Stable Synchronization**: Added beat index tracking in worker to prevent erratic head movements and timing inconsistencies.
+
 ### v2.2.2 (No More UI Lag) ⚡🧵
 
 - **Web Worker Audio Processing**: Moved all heavy audio calculations to a separate thread to prevent UI freezing.

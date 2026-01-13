@@ -126,12 +126,19 @@ function correctBigDrift(progressMs: number) {
 		expectedTime -= videoDuration
 	}
 
-	const drift = Math.abs(videoElement.currentTime - expectedTime)
-	const wrappedDrift = Math.min(drift, videoDuration - drift)
+	const drift = videoElement.currentTime - expectedTime
+	const wrappedDrift =
+		Math.abs(drift) > videoDuration / 2
+			? drift > 0
+				? drift - videoDuration
+				: drift + videoDuration
+			: drift
 
-	if (wrappedDrift > 0.3) {
+	if (Math.abs(wrappedDrift) > 1.5) {
 		videoElement.currentTime = expectedTime
 		currentRate = 1
+	} else if (Math.abs(wrappedDrift) > 0.5) {
+		currentRate = 1 + (wrappedDrift > 0 ? 0.1 : -0.1)
 	}
 }
 
