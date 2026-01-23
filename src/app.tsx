@@ -3,6 +3,7 @@ import { settings, SETTINGS_SCHEMA } from './settings'
 import { fetchAudioData, getPlaybackRate, getDynamicAnalysis, getAudioData } from './audio'
 import { createWebMVideo, syncTiming, getVideoElement, syncVideoToMusicBeat } from './video'
 import { performanceMonitor, createTimedRAF } from './performance'
+import { getRateBuffer } from './rate-buffer'
 
 async function main() {
 	console.log('[CAT-JAM] Extension initializing...')
@@ -230,7 +231,15 @@ async function main() {
 			const { type, data } = e.data
 			if (type === 'result' && getVideoElement()) {
 				const videoElement = getVideoElement()!
-				videoElement.playbackRate = data.playbackRate
+				const perfLevel = performanceMonitor.getPerformanceLevel()
+				const buffer = getRateBuffer(perfLevel)
+
+				buffer.push(data.playbackRate, performance.now())
+				const output = buffer.getOutput()
+
+				if (!output.shouldSkip) {
+					videoElement.playbackRate = output.rate
+				}
 				videoElement.style.transform = `scale(${data.scale})`
 			}
 		}
@@ -283,6 +292,9 @@ async function main() {
 			startLoop()
 		} else {
 			worker?.postMessage({ type: 'resetRate' })
+			getRateBuffer('high').clear()
+			getRateBuffer('medium').clear()
+			getRateBuffer('low').clear()
 		}
 	})
 
@@ -298,6 +310,10 @@ async function main() {
 	Spicetify.Player.addEventListener('songchange', async () => {
 		const videoElement = getVideoElement()
 		if (!videoElement) return
+
+		getRateBuffer('high').clear()
+		getRateBuffer('medium').clear()
+		getRateBuffer('low').clear()
 
 		const startTime = performance.now()
 		const audioData = await fetchAudioData()
