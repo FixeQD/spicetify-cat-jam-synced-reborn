@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+### v2.3.0 (Performance Boost) 🚀🎯
+
+- **Adaptive Performance System**: Added FPS-based throttling that adjusts update frequency based on system performance (low/medium/high modes).
+- **Predictive Sync Engine**: Enhanced beat-aligned prediction with velocity history tracking for smoother rate transitions.
+- **Rate Buffer System**: Frame-dropping buffer prevents jarring jumps during rapid playback rate changes.
+- **Dynamic Tuning**: Each performance level now has optimized lerp factors, drift thresholds, and snap behaviors.
+
 ### v2.2.4 (Smooth Loop) 🔄✨
 
 - **Fixed Video Loop Jank**: Replaced native HTML5 loop with custom threshold-based reset to eliminate stuttering at loop boundaries.
