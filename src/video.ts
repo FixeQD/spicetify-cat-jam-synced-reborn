@@ -25,6 +25,20 @@ function calculateSmoothPlaybackRate(
 
 	const result = syncEngine.update(progressSec, currentVideoTime, audioData, perfLevel)
 
+	if (result.needsReset) {
+		const videoDuration = APP_CONFIG.VIDEO_DURATION
+		if (result.snapTime !== undefined) {
+			let wrappedCurrent = currentVideoTime
+			if (wrappedCurrent >= videoDuration) wrappedCurrent -= videoDuration
+			const drift = wrappedCurrent - result.snapTime
+			if (Math.abs(drift) > 1.5) {
+				videoElement.currentTime = result.snapTime
+			}
+		}
+		syncEngine.reset()
+		return 1
+	}
+
 	if (result.shouldSnap && result.snapTime !== undefined) {
 		const videoDuration = APP_CONFIG.VIDEO_DURATION
 		let wrappedCurrent = currentVideoTime

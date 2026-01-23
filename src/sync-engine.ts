@@ -18,25 +18,31 @@ export interface SyncConfig {
 
 export const SYNC_CONFIGS = {
 	high: {
-		lerpFactor: 0.08,
-		maxDelta: 0.02,
-		snapThreshold: 0.05,
-		velocityWeight: 0.3,
-		maxDriftCorrection: 0.15,
+		lerpFactor: 0.1,
+		maxDelta: 0.025,
+		snapThreshold: 0.04,
+		velocityWeight: 0.35,
+		maxDriftCorrection: 0.2,
+		aggressiveSnapThreshold: 0.02,
+		minStableFrames: 3,
 	} as SyncConfig,
 	medium: {
-		lerpFactor: 0.05,
-		maxDelta: 0.015,
-		snapThreshold: 0.07,
-		velocityWeight: 0.25,
-		maxDriftCorrection: 0.12,
+		lerpFactor: 0.06,
+		maxDelta: 0.018,
+		snapThreshold: 0.06,
+		velocityWeight: 0.28,
+		maxDriftCorrection: 0.15,
+		aggressiveSnapThreshold: 0.03,
+		minStableFrames: 4,
 	} as SyncConfig,
 	low: {
-		lerpFactor: 0.03,
-		maxDelta: 0.01,
-		snapThreshold: 0.1,
-		velocityWeight: 0.2,
-		maxDriftCorrection: 0.1,
+		lerpFactor: 0.04,
+		maxDelta: 0.012,
+		snapThreshold: 0.08,
+		velocityWeight: 0.22,
+		maxDriftCorrection: 0.12,
+		aggressiveSnapThreshold: 0.04,
+		minStableFrames: 5,
 	} as SyncConfig,
 }
 
@@ -68,7 +74,7 @@ export class PredictiveSyncEngine {
 		currentVideoTime: number,
 		audioData: any,
 		perfLevel: 'low' | 'medium' | 'high' = 'high'
-	): { playbackRate: number; shouldSnap: boolean; snapTime?: number } {
+	): { playbackRate: number; shouldSnap: boolean; snapTime?: number; needsReset?: boolean } {
 		if (!audioData?.beats?.length) {
 			return { playbackRate: 1, shouldSnap: false }
 		}
@@ -97,7 +103,7 @@ export class PredictiveSyncEngine {
 		)
 
 		if (timeUntilBeat <= config.snapThreshold) {
-			return this.handleBeatSnap(
+			const snapResult = this.handleBeatSnap(
 				progressSec,
 				currentVideoTime,
 				nextBeat,
@@ -105,6 +111,12 @@ export class PredictiveSyncEngine {
 				beatIndex,
 				config
 			)
+			return {
+				playbackRate: snapResult.playbackRate,
+				shouldSnap: snapResult.shouldSnap,
+				snapTime: snapResult.snapTime,
+				needsReset: snapResult.needsReset,
+			}
 		}
 
 		const predictedVelocity = this.calculateVelocityPrediction(targetRate, perfLevel)
@@ -198,7 +210,7 @@ export class PredictiveSyncEngine {
 		beats: any[],
 		beatIndex: number,
 		config: SyncConfig
-	): { playbackRate: number; shouldSnap: boolean; snapTime: number } {
+	): { playbackRate: number; shouldSnap: boolean; snapTime: number; needsReset: boolean } {
 		const drops = APP_CONFIG.CAT_HEAD_DROPS
 		const duration = APP_CONFIG.VIDEO_DURATION
 
@@ -220,20 +232,44 @@ export class PredictiveSyncEngine {
 		const wrappedVideo =
 			currentVideoTime >= duration ? currentVideoTime - duration : currentVideoTime
 
-		const drift = wrappedVideo - wrappedExpected
-		const maxCorrection = config.maxDriftCorrection
+		let drift = wrappedVideo - wrappedExpected
 
-		let snapRate = 1
-		if (Math.abs(drift) > maxCorrection) {
-			snapRate = drift > 0 ? 1 - Math.abs(drift) * 0.1 : 1 + Math.abs(drift) * 0.1
+		if (Math.abs(drift) > duration / 2) {
+			drift = drift > 0 ? drift - duration : drift + duration
 		}
 
-		this.state.playbackRate = this.lerp(this.state.playbackRate, snapRate, 0.2)
+		const absDrift = Math.abs(drift)
+		const maxCorrection = config.maxDriftCorrection
+		const aggressiveThreshold = (config as any).aggressiveSnapThreshold ?? 0.02
+
+		let snapRate = 1
+
+		if (absDrift > 1.5) {
+			this.state.playbackRate = 1
+			return {
+				playbackRate: 1,
+				shouldSnap: true,
+				snapTime: wrappedExpected,
+				needsReset: true,
+			}
+		}
+
+		if (absDrift > maxCorrection) {
+			const correctionStrength = absDrift > aggressiveThreshold ? 0.15 : 0.1
+			snapRate =
+				drift > 0
+					? 1 - Math.min(absDrift * correctionStrength, 0.2)
+					: 1 + Math.min(absDrift * correctionStrength, 0.2)
+		}
+
+		const lerpFactor = absDrift > maxCorrection ? 0.25 : 0.15
+		this.state.playbackRate = this.lerp(this.state.playbackRate, snapRate, lerpFactor)
 
 		return {
 			playbackRate: this.clamp(this.state.playbackRate, 0.85, 1.3),
 			shouldSnap: true,
 			snapTime: wrappedExpected,
+			needsReset: false,
 		}
 	}
 
