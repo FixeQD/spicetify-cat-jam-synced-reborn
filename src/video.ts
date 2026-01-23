@@ -66,10 +66,9 @@ function calculateSmoothPlaybackRate(progressMs: number): number {
 	const clampedTarget = Math.max(0.85, Math.min(1.3, targetRate))
 
 	// smooth transition - don't jump rates instantly
-	currentRate = lerp(currentRate, clampedTarget, 0.08)
+	currentRate = lerp(currentRate, clampedTarget, lerpFactor)
 
 	// limit max change per frame to prevent jumps
-	const maxDelta = 0.02
 	if (Math.abs(currentRate - clampedTarget) > maxDelta) {
 		return currentRate
 	}
@@ -142,7 +141,11 @@ function correctBigDrift(progressMs: number) {
 	}
 }
 
-export function syncVideoToMusicBeat(progressMs: number) {
+export function syncVideoToMusicBeat(
+	progressMs: number,
+	lerpFactor: number = 0.08,
+	maxDelta: number = 0.02
+) {
 	if (!videoElement) return
 
 	correctBigDrift(progressMs)

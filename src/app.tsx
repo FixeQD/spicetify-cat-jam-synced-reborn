@@ -2,6 +2,7 @@ import { APP_CONFIG } from './config'
 import { settings, SETTINGS_SCHEMA } from './settings'
 import { fetchAudioData, getPlaybackRate, getDynamicAnalysis, getAudioData } from './audio'
 import { createWebMVideo, syncTiming, getVideoElement, syncVideoToMusicBeat } from './video'
+import { performanceMonitor, createTimedRAF } from './performance'
 
 async function main() {
 	console.log('[CAT-JAM] Extension initializing...')
@@ -39,6 +40,12 @@ async function main() {
 				`(${(() => {
 					const CAT_HEAD_DROPS = APP_CONFIG.CAT_HEAD_DROPS
 					const VIDEO_DURATION = APP_CONFIG.VIDEO_DURATION
+					const LERP_FACTOR_HIGH = 0.08
+					const LERP_FACTOR_MEDIUM = 0.05
+					const LERP_FACTOR_LOW = 0.03
+					const MAX_RATE_DELTA_HIGH = 0.02
+					const MAX_RATE_DELTA_MEDIUM = 0.015
+					const MAX_RATE_DELTA_LOW = 0.01
 					let currentRate = 1
 					let currentBeatIndex = -1
 
@@ -46,7 +53,11 @@ async function main() {
 						const { type, data } = e.data
 
 						if (type === 'process' && data.audioData) {
-							const result = processAudioData(data.progressMs, data.audioData)
+							const result = processAudioData(
+								data.progressMs,
+								data.audioData,
+								data.perfLevel
+							)
 							self.postMessage({ type: 'result', data: result })
 						}
 
@@ -56,10 +67,27 @@ async function main() {
 						}
 					}
 
-					function processAudioData(progressMs: number, audioData: any) {
-						const progressSec = progressMs / 1000
+					function getTuning(perfLevel: string) {
+						if (perfLevel === 'low')
+							return { lerp: LERP_FACTOR_LOW, maxDelta: MAX_RATE_DELTA_LOW }
+						if (perfLevel === 'medium')
+							return { lerp: LERP_FACTOR_MEDIUM, maxDelta: MAX_RATE_DELTA_MEDIUM }
+						return { lerp: LERP_FACTOR_HIGH, maxDelta: MAX_RATE_DELTA_HIGH }
+					}
 
-						const playbackRate = calculateSmoothPlaybackRate(progressSec, audioData)
+					function processAudioData(
+						progressMs: number,
+						audioData: any,
+						perfLevel: string = 'high'
+					) {
+						const progressSec = progressMs / 1000
+						const { lerp: lerpFactor, maxDelta } = getTuning(perfLevel)
+						const playbackRate = calculateSmoothPlaybackRate(
+							progressSec,
+							audioData,
+							lerpFactor,
+							maxDelta
+						)
 
 						const loudness = getLoudnessAt(audioData.segments, progressSec)
 						const normalizedLoudness = Math.max(0, Math.min(1, (loudness + 60) / 60))
@@ -110,7 +138,9 @@ async function main() {
 
 					function calculateSmoothPlaybackRate(
 						progressSec: number,
-						audioData: any
+						audioData: any,
+						lerpFactor: number = 0.08,
+						maxDelta: number = 0.02
 					): number {
 						if (!audioData?.beats?.length) return 1
 
@@ -153,9 +183,8 @@ async function main() {
 						const targetRate = timeUntilDrop / timeUntilBeat
 						const clampedTarget = Math.max(0.85, Math.min(1.3, targetRate))
 
-						currentRate = lerp(currentRate, clampedTarget, 0.08)
+						currentRate = lerp(currentRate, clampedTarget, lerpFactor)
 
-						const maxDelta = 0.02
 						if (Math.abs(currentRate - clampedTarget) > maxDelta) {
 							return currentRate
 						}
@@ -210,7 +239,7 @@ async function main() {
 		worker = null
 	}
 
-	const updateLoop = async () => {
+	const updateLoop = createTimedRAF(async (timestamp: number) => {
 		if (!Spicetify.Player.isPlaying()) {
 			animationId = null
 			getVideoElement()?.pause()
@@ -218,17 +247,24 @@ async function main() {
 		}
 
 		const progress = Spicetify.Player.getProgress()
+		const perfLevel = performanceMonitor.getPerformanceLevel()
 
 		if (worker && workerReady) {
 			const audioData = getAudioData()
 			if (audioData) {
 				worker.postMessage({
 					type: 'process',
-					data: { progressMs: progress, audioData },
+					data: { progressMs: progress, audioData, perfLevel },
 				})
 			}
 		} else {
-			syncVideoToMusicBeat(progress)
+			const syncLerpFactor =
+				APP_CONFIG.SYNC[`LERP_FACTOR_${perfLevel.toUpperCase()}`] ??
+				APP_CONFIG.SYNC.LERP_FACTOR_HIGH
+			const syncMaxDelta =
+				APP_CONFIG.SYNC[`MAX_RATE_DELTA_${perfLevel.toUpperCase()}`] ??
+				APP_CONFIG.SYNC.MAX_RATE_DELTA_HIGH
+			syncVideoToMusicBeat(progress, syncLerpFactor, syncMaxDelta)
 
 			const { loudness } = getDynamicAnalysis(progress)
 			const videoElement = getVideoElement()
@@ -240,7 +276,7 @@ async function main() {
 		}
 
 		animationId = requestAnimationFrame(updateLoop)
-	}
+	})
 
 	const startLoop = () => {
 		if (!animationId) animationId = requestAnimationFrame(updateLoop)
