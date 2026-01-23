@@ -39,14 +39,6 @@ export const APP_CONFIG = {
 		MEASUREMENT_WINDOW_MS: 1000,
 		SAMPLE_COUNT: 30,
 	},
-	SYNC: {
-		LERP_FACTOR_HIGH: 0.08,
-		LERP_FACTOR_MEDIUM: 0.05,
-		LERP_FACTOR_LOW: 0.03,
-		MAX_RATE_DELTA_HIGH: 0.02,
-		MAX_RATE_DELTA_MEDIUM: 0.015,
-		MAX_RATE_DELTA_LOW: 0.01,
-	},
 	API: {
 		AUDIO_FEATURES: 'https://api.spotify.com/v1/audio-features/',
 	},

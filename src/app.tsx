@@ -258,13 +258,7 @@ async function main() {
 				})
 			}
 		} else {
-			const syncLerpFactor =
-				APP_CONFIG.SYNC[`LERP_FACTOR_${perfLevel.toUpperCase()}`] ??
-				APP_CONFIG.SYNC.LERP_FACTOR_HIGH
-			const syncMaxDelta =
-				APP_CONFIG.SYNC[`MAX_RATE_DELTA_${perfLevel.toUpperCase()}`] ??
-				APP_CONFIG.SYNC.MAX_RATE_DELTA_HIGH
-			syncVideoToMusicBeat(progress, syncLerpFactor, syncMaxDelta)
+			syncVideoToMusicBeat(progress, perfLevel)
 
 			const { loudness } = getDynamicAnalysis(progress)
 			const videoElement = getVideoElement()
