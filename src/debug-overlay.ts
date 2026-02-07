@@ -5,10 +5,13 @@ import { getLocalBPM, getLoudnessAt, normalizeLoudness } from './analyzer'
 import { APP_CONFIG } from './config'
 import { getVideoElement } from './video'
 
+declare const __APP_VERSION__: string
+
 export interface DebugMetrics {
 	progressMs: number
 	perfLevel: 'low' | 'medium' | 'high'
 	workerActive: boolean
+	targetRate?: number
 }
 
 let overlay: HTMLDivElement | null = null
@@ -16,12 +19,15 @@ let visible = false
 let animFrameId: number | null = null
 let lastMetrics: DebugMetrics = { progressMs: 0, perfLevel: 'high', workerActive: false }
 
-// beat accuracy tracking
-let beatHits = 0
-let beatTotal = 0
-let lastTrackedBeatIndex = -1
+const ACCURACY_WINDOW = 200
+const HIT_THRESHOLD_MS = 80
+let driftHistory: number[] = []
+let lastMeasuredBeatIndex = -1
 
-const ACCURACY_WINDOW = 50
+export function resetBeatAccuracy() {
+	driftHistory = []
+	lastMeasuredBeatIndex = -1
+}
 
 function createStyles(): string {
 	return `
@@ -69,7 +75,7 @@ function createOverlayElement(): HTMLDivElement {
 				font-size: 9px;
 				color: rgba(255, 255, 255, 0.35);
 				letter-spacing: 0.3px;
-			">v${APP_CONFIG.DEFAULTS.BPM ? '2.3.0' : '?'} - drag to move</span>
+			">v${__APP_VERSION__} - drag to move</span>
 		</div>
 		<div id="catjam-debug-content" style="padding: 10px 12px;"></div>
 	`
@@ -163,57 +169,20 @@ function separator(title?: string): string {
 	return '<div style="margin: 4px 0; border-top: 1px solid rgba(255,255,255,0.06);"></div>'
 }
 
-// tracks actual beat-to-head-drop timing for real drift measurement
-let lastBeatTime = 0
-let lastHeadDropTime = 0
-let currentDrift = 0
-let prevBeatIndex = -1
-let prevDropIndex = -1
-
-function trackDrift(videoTime: number, progressSec: number, audioData: any) {
-	if (!audioData?.beats?.length) return
-
+function measureDrift(videoTime: number): number {
 	const drops = APP_CONFIG.CAT_HEAD_DROPS
-	const beats = audioData.beats
+	const duration = APP_CONFIG.VIDEO_DURATION
 
-	// find current beat
-	let beatIndex = -1
-	for (let i = beats.length - 1; i >= 0; i--) {
-		if (beats[i].start <= progressSec) {
-			beatIndex = i
-			break
-		}
+	let vt = videoTime % duration
+	if (vt < 0) vt += duration
+
+	let minDist = Infinity
+	for (const drop of drops) {
+		const d1 = Math.abs(vt - drop)
+		const d2 = duration - d1
+		if (Math.min(d1, d2) < minDist) minDist = Math.min(d1, d2)
 	}
-
-	// detect beat transition
-	if (beatIndex >= 0 && beatIndex !== prevBeatIndex) {
-		lastBeatTime = beats[beatIndex].start
-		prevBeatIndex = beatIndex
-	}
-
-	// detect head drop transition
-	let dropIndex = -1
-	for (let i = drops.length - 1; i >= 0; i--) {
-		if (drops[i] <= videoTime) {
-			dropIndex = i
-			break
-		}
-	}
-
-	if (dropIndex >= 0 && dropIndex !== prevDropIndex) {
-		lastHeadDropTime = drops[dropIndex]
-		prevDropIndex = dropIndex
-
-		if (lastBeatTime > 0) {
-			const video = getVideoElement()
-			const rate = video?.playbackRate ?? 1
-			const timeSinceDropInVideo = videoTime - lastHeadDropTime
-			const timeSinceDropReal = rate > 0 ? timeSinceDropInVideo / rate : 0
-			const dropMusicTime = progressSec - timeSinceDropReal
-
-			currentDrift = dropMusicTime - lastBeatTime
-		}
-	}
+	return minDist
 }
 
 function renderContent(): string {
@@ -237,9 +206,16 @@ function renderContent(): string {
 		}
 	}
 
-	// update drift tracking
-	trackDrift(videoTime, progressSec, audioData)
-	const driftMs = currentDrift * 1000
+	const liveDriftSec = measureDrift(videoTime)
+	const liveDriftMs = liveDriftSec * 1000
+
+	if (audioData?.beats?.length && beatIndex >= 0 && beatIndex !== lastMeasuredBeatIndex) {
+		lastMeasuredBeatIndex = beatIndex
+		driftHistory.push(liveDriftMs)
+		if (driftHistory.length > ACCURACY_WINDOW) {
+			driftHistory.shift()
+		}
+	}
 
 	// performance section
 	let html = separator('PERFORMANCE')
@@ -259,29 +235,26 @@ function renderContent(): string {
 
 	// sync section
 	html += separator('SYNC ENGINE')
-	html += row('Playback Rate', formatRate(actualRate))
+	html += row('Actual Rate', formatRate(actualRate))
+	if (lastMetrics.targetRate !== undefined) {
+		html += row('Target Rate', formatRate(lastMetrics.targetRate), '#60a5fa')
+	}
 	html += row('Beat Index', String(beatIndex))
+	html += row('Beat Drift', `${liveDriftMs.toFixed(1)}ms`, driftColor(liveDriftMs))
 
-	const driftSign = driftMs >= 0 ? '+' : ''
-	html += row('Drift', `${driftSign}${driftMs.toFixed(1)}ms`, driftColor(driftMs))
-
-	// beat accuracy
-	if (audioData?.beats?.length && beatIndex >= 0) {
-		if (beatIndex !== lastTrackedBeatIndex) {
-			lastTrackedBeatIndex = beatIndex
-			beatTotal++
-			if (Math.abs(driftMs) < 50) beatHits++
-			if (beatTotal > ACCURACY_WINDOW) {
-				const excess = beatTotal - ACCURACY_WINDOW
-				beatTotal = ACCURACY_WINDOW
-				beatHits = Math.max(0, beatHits - excess)
-			}
-		}
-		const accuracy = beatTotal > 0 ? (beatHits / beatTotal) * 100 : 0
+	if (driftHistory.length > 0) {
+		const hits = driftHistory.filter((d) => d < HIT_THRESHOLD_MS).length
+		const accuracy = (hits / driftHistory.length) * 100
 		html += row(
 			'Beat Accuracy',
-			`${accuracy.toFixed(1)}% (last ${beatTotal})`,
-			accuracy > 85 ? '#4ade80' : accuracy > 60 ? '#facc15' : '#f87171'
+			`${accuracy.toFixed(1)}% (last ${driftHistory.length})`,
+			accuracy > 85
+				? '#4ade80'
+				: accuracy > 60
+					? '#facc15'
+					: accuracy >= 30
+						? undefined
+						: '#f87171'
 		)
 	}
 
@@ -312,13 +285,11 @@ function renderContent(): string {
 	html += separator('VIDEO')
 	if (video) {
 		html += row('Video Time', video.currentTime.toFixed(3) + 's')
-		html += row('Video Rate', formatRate(video.playbackRate))
 		html += row('Paused', video.paused ? 'YES' : 'NO', video.paused ? '#f87171' : '#4ade80')
 
 		// next head drop
 		const drops = APP_CONFIG.CAT_HEAD_DROPS
 		const nextDrop = drops.find((d) => d > video.currentTime)
-		const nextDropTime = nextDrop ?? drops[0] + APP_CONFIG.VIDEO_DURATION
 		const timeUntilDrop = nextDrop
 			? nextDrop - video.currentTime
 			: APP_CONFIG.VIDEO_DURATION - video.currentTime + drops[0]

@@ -4,7 +4,7 @@ import { fetchAudioData, getPlaybackRate, getDynamicAnalysis, getAudioData } fro
 import { createWebMVideo, syncTiming, getVideoElement, syncVideoToMusicBeat } from './video'
 import { performanceMonitor, createTimedRAF } from './performance'
 import { getRateBuffer } from './rate-buffer'
-import { updateDebugMetrics } from './debug-overlay'
+import { updateDebugMetrics, resetBeatAccuracy } from './debug-overlay'
 
 async function main() {
 	console.log('[CAT-JAM] Extension initializing...')
@@ -42,12 +42,14 @@ async function main() {
 				`(${(() => {
 					const CAT_HEAD_DROPS = APP_CONFIG.CAT_HEAD_DROPS
 					const VIDEO_DURATION = APP_CONFIG.VIDEO_DURATION
-					const LERP_FACTOR_HIGH = 0.08
-					const LERP_FACTOR_MEDIUM = 0.05
-					const LERP_FACTOR_LOW = 0.03
-					const MAX_RATE_DELTA_HIGH = 0.02
-					const MAX_RATE_DELTA_MEDIUM = 0.015
-					const MAX_RATE_DELTA_LOW = 0.01
+					const MAX_SCALE = APP_CONFIG.VISUAL.MAX_SCALE
+
+					const LERP_FACTORS: Record<string, number> = {
+						high: 0.25,
+						medium: 0.18,
+						low: 0.1,
+					}
+
 					let currentRate = 1
 					let currentBeatIndex = -1
 
@@ -57,6 +59,7 @@ async function main() {
 						if (type === 'process' && data.audioData) {
 							const result = processAudioData(
 								data.progressMs,
+								data.videoTime,
 								data.audioData,
 								data.perfLevel
 							)
@@ -69,33 +72,93 @@ async function main() {
 						}
 					}
 
-					function getTuning(perfLevel: string) {
-						if (perfLevel === 'low')
-							return { lerp: LERP_FACTOR_LOW, maxDelta: MAX_RATE_DELTA_LOW }
-						if (perfLevel === 'medium')
-							return { lerp: LERP_FACTOR_MEDIUM, maxDelta: MAX_RATE_DELTA_MEDIUM }
-						return { lerp: LERP_FACTOR_HIGH, maxDelta: MAX_RATE_DELTA_HIGH }
-					}
-
 					function processAudioData(
 						progressMs: number,
+						videoTime: number,
 						audioData: any,
 						perfLevel: string = 'high'
 					) {
 						const progressSec = progressMs / 1000
-						const { lerp: lerpFactor, maxDelta } = getTuning(perfLevel)
-						const playbackRate = calculateSmoothPlaybackRate(
+						const playbackRate = calculateSync(
 							progressSec,
+							videoTime,
 							audioData,
-							lerpFactor,
-							maxDelta
+							perfLevel
 						)
 
 						const loudness = getLoudnessAt(audioData.segments, progressSec)
 						const normalizedLoudness = Math.max(0, Math.min(1, (loudness + 60) / 60))
-						const scale = 1 + normalizedLoudness * (APP_CONFIG.VISUAL.MAX_SCALE - 1)
+						const scale = 1 + normalizedLoudness * (MAX_SCALE - 1)
 
 						return { playbackRate, scale }
+					}
+
+					function calculateSync(
+						progressSec: number,
+						rawVideoTime: number,
+						audioData: any,
+						perfLevel: string
+					): number {
+						if (!audioData?.beats?.length) return 1
+
+						const beats = audioData.beats
+						const lerpFactor = LERP_FACTORS[perfLevel] ?? LERP_FACTORS.high
+
+						// wrap video time to valid range
+						let videoTime = rawVideoTime % VIDEO_DURATION
+						if (videoTime < 0) videoTime = 0
+
+						let beatIndex = -1
+						for (let i = beats.length - 1; i >= 0; i--) {
+							if (beats[i].start <= progressSec) {
+								beatIndex = i
+								break
+							}
+						}
+
+						const nextBeat = findNextBeat(progressSec, beats)
+						if (!nextBeat) {
+							// past all beats - drift back to 1x
+							currentRate = lerp(currentRate, 1, lerpFactor)
+							return currentRate
+						}
+
+						const timeUntilBeat = nextBeat.time - progressSec
+						if (timeUntilBeat < 0.005) return currentRate
+
+						const timeUntilDrop = getTimeUntilNextDrop(videoTime)
+
+						const targetRate = timeUntilDrop / timeUntilBeat
+						const clampedTarget = clamp(targetRate, 0.75, 1.35)
+
+						currentRate = lerp(currentRate, clampedTarget, lerpFactor)
+
+						if (beatIndex !== currentBeatIndex) {
+							currentBeatIndex = beatIndex
+						}
+
+						return currentRate
+					}
+
+					function getTimeUntilNextDrop(videoTime: number): number {
+						for (const drop of CAT_HEAD_DROPS) {
+							if (drop > videoTime) {
+								return drop - videoTime
+							}
+						}
+						return VIDEO_DURATION - videoTime + CAT_HEAD_DROPS[0]
+					}
+
+					function findNextBeat(
+						progressSec: number,
+						beats: any[]
+					): { index: number; time: number } | null {
+						for (let i = 0; i < beats.length; i++) {
+							if (beats[i].start > progressSec) {
+								return { index: i, time: beats[i].start }
+							}
+						}
+						return null
 					}
 
 					function getLoudnessAt(segments: any[], timeSec: number): number {
@@ -138,88 +201,12 @@ async function main() {
 						}
 					}
 
-					function calculateSmoothPlaybackRate(
-						progressSec: number,
-						audioData: any,
-						lerpFactor: number = 0.08,
-						maxDelta: number = 0.02
-					): number {
-						if (!audioData?.beats?.length) return 1
-
-						let beatIndex = -1
-						for (let i = 0; i < audioData.beats.length; i++) {
-							if (audioData.beats[i].start <= progressSec) {
-								beatIndex = i
-							} else {
-								break
-							}
-						}
-
-						if (beatIndex !== currentBeatIndex) {
-							currentBeatIndex = beatIndex
-						}
-
-						const nextBeat = getNextBeat(progressSec, audioData.beats)
-						if (!nextBeat) return 1
-
-						const dropIndex = nextBeat.index % CAT_HEAD_DROPS.length
-						const currentDrop = CAT_HEAD_DROPS[dropIndex]
-						const nextDrop = CAT_HEAD_DROPS[(dropIndex + 1) % CAT_HEAD_DROPS.length]
-
-						let dropDuration: number
-						if (nextDrop > currentDrop) {
-							dropDuration = nextDrop - currentDrop
-						} else {
-							dropDuration = VIDEO_DURATION - currentDrop + nextDrop
-						}
-
-						const timeUntilBeat = nextBeat.time - progressSec
-						if (timeUntilBeat <= 0.05) return currentRate
-
-						const timeUntilDrop =
-							dropDuration *
-							(timeUntilBeat /
-								(audioData.beats[nextBeat.index].start -
-									audioData.beats[beatIndex].start))
-
-						const targetRate = timeUntilDrop / timeUntilBeat
-						const clampedTarget = Math.max(0.85, Math.min(1.3, targetRate))
-
-						currentRate = lerp(currentRate, clampedTarget, lerpFactor)
-
-						if (Math.abs(currentRate - clampedTarget) > maxDelta) {
-							return currentRate
-						}
-
-						return currentRate
-					}
-
-					function getNextHeadDrop(currentVideoTime: number): {
-						index: number
-						time: number
-					} {
-						for (let i = 0; i < CAT_HEAD_DROPS.length; i++) {
-							if (CAT_HEAD_DROPS[i] > currentVideoTime) {
-								return { index: i, time: CAT_HEAD_DROPS[i] }
-							}
-						}
-						return { index: 0, time: CAT_HEAD_DROPS[0] + VIDEO_DURATION }
-					}
-
-					function getNextBeat(
-						progressSec: number,
-						beats: any[]
-					): { index: number; time: number } | null {
-						for (let i = 0; i < beats.length; i++) {
-							if (beats[i].start > progressSec) {
-								return { index: i, time: beats[i].start }
-							}
-						}
-						return null
-					}
-
 					function lerp(current: number, target: number, factor: number): number {
 						return current + (target - current) * factor
+					}
+
+					function clamp(value: number, min: number, max: number): number {
+						return Math.max(min, Math.min(max, value))
 					}
 				}).toString()})()`,
 			],
@@ -242,6 +229,8 @@ async function main() {
 					videoElement.playbackRate = output.rate
 				}
 				videoElement.style.transform = `scale(${data.scale})`
+
+				updateDebugMetrics({ targetRate: data.playbackRate })
 			}
 		}
 	} catch (error) {
@@ -268,9 +257,10 @@ async function main() {
 		if (worker && workerReady) {
 			const audioData = getAudioData()
 			if (audioData) {
+				const videoTime = getVideoElement()?.currentTime ?? 0
 				worker.postMessage({
 					type: 'process',
-					data: { progressMs: progress, audioData, perfLevel },
+					data: { progressMs: progress, audioData, perfLevel, videoTime },
 				})
 			}
 		} else {
@@ -282,6 +272,7 @@ async function main() {
 			if (videoElement) {
 				const scale = 1 + loudness * (APP_CONFIG.VISUAL.MAX_SCALE - 1)
 				videoElement.style.transform = `scale(${scale})`
+				updateDebugMetrics({ targetRate: videoElement.playbackRate })
 			}
 		}
 
@@ -308,8 +299,13 @@ async function main() {
 	let lastProgress = 0
 	Spicetify.Player.addEventListener('onprogress', () => {
 		const progress = Spicetify.Player.getProgress()
-		if (Math.abs(progress - lastProgress) >= APP_CONFIG.DEFAULTS.PROGRESS_THRESHOLD) {
+		const diff = Math.abs(progress - lastProgress)
+		if (diff >= 3000) {
 			syncTiming(performance.now(), progress)
+			worker?.postMessage({ type: 'resetRate' })
+			getRateBuffer('high').clear()
+			getRateBuffer('medium').clear()
+			getRateBuffer('low').clear()
 		}
 		lastProgress = progress
 	})
@@ -321,6 +317,7 @@ async function main() {
 		getRateBuffer('high').clear()
 		getRateBuffer('medium').clear()
 		getRateBuffer('low').clear()
+		resetBeatAccuracy()
 
 		const startTime = performance.now()
 		const audioData = await fetchAudioData()

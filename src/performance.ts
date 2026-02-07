@@ -14,7 +14,7 @@ export class PerformanceMonitor {
 	private frameCount: number = 0
 	private fpsUpdateTime: number = 0
 	private currentFPS: number = 60
-	private droppedFrames: number = 0
+	private droppedTimestamps: number[] = []
 	private measurementWindowMs: number = 1000
 	private samplesCount: number = 30
 
@@ -29,7 +29,7 @@ export class PerformanceMonitor {
 			level: this.getPerformanceLevel(),
 			fps: this.currentFPS,
 			frameTime: this.lastFrameTime,
-			droppedFrames: this.droppedFrames,
+			droppedFrames: this.getDroppedFrames(),
 			avgFrameTime: this.getAverageFrameTime(),
 		}
 	}
@@ -37,11 +37,14 @@ export class PerformanceMonitor {
 	measureFrame() {
 		const now = performance.now()
 		if (this.lastFrameTime > 0) {
-			const frameTime = now - this.lastFrameTime
-			this.frameTimes.push(frameTime)
+			const delta = now - this.lastFrameTime
+			this.frameTimes.push(delta)
 
-			if (frameTime > 33.33) {
-				this.droppedFrames++
+			const missedFrames = Math.floor(delta / 16.67) - 1
+			if (missedFrames > 0 && delta > 50) {
+				for (let i = 0; i < missedFrames; i++) {
+					this.droppedTimestamps.push(now)
+				}
 			}
 
 			if (this.frameTimes.length > this.samplesCount) {
@@ -64,6 +67,14 @@ export class PerformanceMonitor {
 		return sum / this.frameTimes.length
 	}
 
+	getDroppedFrames(): number {
+		const now = performance.now()
+		this.droppedTimestamps = this.droppedTimestamps.filter(
+			(t) => now - t < this.measurementWindowMs
+		)
+		return this.droppedTimestamps.length
+	}
+
 	getThrottleInterval(): number {
 		const level = this.getPerformanceLevel()
 		if (level === 'low') return 33.33
@@ -74,7 +85,9 @@ export class PerformanceMonitor {
 	shouldSkipFrame(): boolean {
 		const throttle = this.getThrottleInterval()
 		if (throttle === 0) return false
-		return this.lastFrameTime > 0 && this.lastFrameTime < throttle
+		if (this.frameTimes.length === 0) return false
+		const lastDelta = this.frameTimes[this.frameTimes.length - 1]
+		return lastDelta < throttle
 	}
 
 	reset() {
@@ -83,7 +96,7 @@ export class PerformanceMonitor {
 		this.frameCount = 0
 		this.fpsUpdateTime = 0
 		this.currentFPS = 60
-		this.droppedFrames = 0
+		this.droppedTimestamps = []
 	}
 }
 
@@ -92,8 +105,6 @@ export const performanceMonitor = new PerformanceMonitor()
 export function createTimedRAF(callback: (timestamp: number) => void): (timestamp: number) => void {
 	return (timestamp: number) => {
 		performanceMonitor.measureFrame()
-		if (!performanceMonitor.shouldSkipFrame()) {
-			callback(timestamp)
-		}
+		callback(timestamp)
 	}
 }

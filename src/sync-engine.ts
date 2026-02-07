@@ -3,70 +3,25 @@ import { APP_CONFIG } from './config'
 export interface SyncState {
 	playbackRate: number
 	currentBeatIndex: number
-	lastBeatTime: number
-	expectedVideoTime: number
-	drift: number
 }
 
-export interface SyncConfig {
-	lerpFactor: number
-	maxDelta: number
-	snapThreshold: number
-	velocityWeight: number
-	maxDriftCorrection: number
-}
-
-export const SYNC_CONFIGS = {
-	high: {
-		lerpFactor: 0.1,
-		maxDelta: 0.025,
-		snapThreshold: 0.04,
-		velocityWeight: 0.35,
-		maxDriftCorrection: 0.2,
-		aggressiveSnapThreshold: 0.02,
-		minStableFrames: 3,
-	} as SyncConfig,
-	medium: {
-		lerpFactor: 0.06,
-		maxDelta: 0.018,
-		snapThreshold: 0.06,
-		velocityWeight: 0.28,
-		maxDriftCorrection: 0.15,
-		aggressiveSnapThreshold: 0.03,
-		minStableFrames: 4,
-	} as SyncConfig,
-	low: {
-		lerpFactor: 0.04,
-		maxDelta: 0.012,
-		snapThreshold: 0.08,
-		velocityWeight: 0.22,
-		maxDriftCorrection: 0.12,
-		aggressiveSnapThreshold: 0.04,
-		minStableFrames: 5,
-	} as SyncConfig,
+const LERP_FACTORS: Record<string, number> = {
+	high: 0.25,
+	medium: 0.18,
+	low: 0.1,
 }
 
 export class PredictiveSyncEngine {
 	private state: SyncState = {
 		playbackRate: 1,
 		currentBeatIndex: -1,
-		lastBeatTime: 0,
-		expectedVideoTime: 0,
-		drift: 0,
 	}
-
-	private velocityHistory: number[] = []
-	private readonly velocityHistorySize = 5
 
 	reset() {
 		this.state = {
 			playbackRate: 1,
 			currentBeatIndex: -1,
-			lastBeatTime: 0,
-			expectedVideoTime: 0,
-			drift: 0,
 		}
-		this.velocityHistory = []
 	}
 
 	update(
@@ -74,79 +29,50 @@ export class PredictiveSyncEngine {
 		currentVideoTime: number,
 		audioData: any,
 		perfLevel: 'low' | 'medium' | 'high' = 'high'
-	): { playbackRate: number; shouldSnap: boolean; snapTime?: number; needsReset?: boolean } {
+	): { playbackRate: number } {
 		if (!audioData?.beats?.length) {
-			return { playbackRate: 1, shouldSnap: false }
+			return { playbackRate: 1 }
 		}
 
-		const config = SYNC_CONFIGS[perfLevel] ?? SYNC_CONFIGS.high
 		const beats = audioData.beats
+		const lerpFactor = LERP_FACTORS[perfLevel] ?? LERP_FACTORS.high
+		const duration = APP_CONFIG.VIDEO_DURATION
+		const drops = APP_CONFIG.CAT_HEAD_DROPS
 
-		let beatIndex = this.findCurrentBeat(progressSec, beats)
-		if (beatIndex < 0) beatIndex = 0
+		let videoTime = currentVideoTime % duration
+		if (videoTime < 0) videoTime = 0
+
+		let beatIndex = -1
+		for (let i = beats.length - 1; i >= 0; i--) {
+			if (beats[i].start <= progressSec) {
+				beatIndex = i
+				break
+			}
+		}
 
 		const nextBeat = this.findNextBeat(progressSec, beats)
 		if (!nextBeat) {
-			return { playbackRate: this.state.playbackRate, shouldSnap: false }
+			this.state.playbackRate = this.lerp(this.state.playbackRate, 1, lerpFactor)
+			return { playbackRate: this.state.playbackRate }
 		}
 
-		if (beatIndex !== this.state.currentBeatIndex && this.state.currentBeatIndex >= 0) {
-			this.onBeatTransition(beatIndex, progressSec, config)
-		}
-		this.state.currentBeatIndex = beatIndex
-
-		const { targetRate, timeUntilBeat, timeUntilDrop } = this.calculateTargetRate(
-			progressSec,
-			currentVideoTime,
-			nextBeat,
-			beats
-		)
-
-		if (timeUntilBeat <= config.snapThreshold) {
-			const snapResult = this.handleBeatSnap(
-				progressSec,
-				currentVideoTime,
-				nextBeat,
-				beats,
-				beatIndex,
-				config
-			)
-			return {
-				playbackRate: snapResult.playbackRate,
-				shouldSnap: snapResult.shouldSnap,
-				snapTime: snapResult.snapTime,
-				needsReset: snapResult.needsReset,
-			}
+		const timeUntilBeat = nextBeat.time - progressSec
+		if (timeUntilBeat < 0.005) {
+			return { playbackRate: this.state.playbackRate }
 		}
 
-		const predictedVelocity = this.calculateVelocityPrediction(targetRate, perfLevel)
+		const timeUntilDrop = this.getTimeUntilNextDrop(videoTime, drops, duration)
 
-		const clampedTarget = this.clampTargetRate(targetRate, config)
-		this.state.playbackRate = this.smoothTransition(
-			this.state.playbackRate,
-			clampedTarget,
-			config,
-			predictedVelocity
-		)
+		const targetRate = timeUntilDrop / timeUntilBeat
+		const clampedTarget = Math.max(0.75, Math.min(1.35, targetRate))
 
-		this.state.drift = this.calculateDrift(
-			currentVideoTime,
-			progressSec,
-			nextBeat,
-			beats,
-			beatIndex
-		)
+		this.state.playbackRate = this.lerp(this.state.playbackRate, clampedTarget, lerpFactor)
 
-		return { playbackRate: this.state.playbackRate, shouldSnap: false }
-	}
-
-	private findCurrentBeat(progressSec: number, beats: any[]): number {
-		for (let i = beats.length - 1; i >= 0; i--) {
-			if (beats[i].start <= progressSec) {
-				return i
-			}
+		if (beatIndex !== this.state.currentBeatIndex) {
+			this.state.currentBeatIndex = beatIndex
 		}
-		return -1
+
+		return { playbackRate: this.state.playbackRate }
 	}
 
 	private findNextBeat(
@@ -161,196 +87,13 @@ export class PredictiveSyncEngine {
 		return null
 	}
 
-	private getNextHeadDrop(videoTime: number): { index: number; time: number } {
-		const drops = APP_CONFIG.CAT_HEAD_DROPS
-		const duration = APP_CONFIG.VIDEO_DURATION
-
-		for (let i = 0; i < drops.length; i++) {
-			if (drops[i] > videoTime) {
-				return { index: i, time: drops[i] }
+	private getTimeUntilNextDrop(videoTime: number, drops: number[], duration: number): number {
+		for (const drop of drops) {
+			if (drop > videoTime) {
+				return drop - videoTime
 			}
 		}
-		return { index: 0, time: drops[0] + duration }
-	}
-
-	private calculateTargetRate(
-		progressSec: number,
-		currentVideoTime: number,
-		nextBeat: { index: number; time: number },
-		beats: any[]
-	): { targetRate: number; timeUntilBeat: number; timeUntilDrop: number } {
-		const drops = APP_CONFIG.CAT_HEAD_DROPS
-		const duration = APP_CONFIG.VIDEO_DURATION
-		const currentDrop = this.getNextHeadDrop(currentVideoTime)
-
-		let dropDuration: number
-		if (currentDrop.time < duration) {
-			dropDuration = currentDrop.time - currentVideoTime
-		} else {
-			dropDuration = duration - currentVideoTime + drops[0]
-		}
-
-		const beatIndex = this.findCurrentBeat(progressSec, beats)
-		const beatDuration =
-			beatIndex >= 0 && beatIndex < beats.length - 1
-				? beats[beatIndex + 1].start - beats[beatIndex].start
-				: 1
-
-		const timeUntilBeat = nextBeat.time - progressSec
-		const timeUntilDrop = dropDuration * (timeUntilBeat / beatDuration)
-		const targetRate = timeUntilDrop > 0 ? timeUntilDrop / timeUntilBeat : 1
-
-		return { targetRate, timeUntilBeat, timeUntilDrop }
-	}
-
-	private handleBeatSnap(
-		progressSec: number,
-		currentVideoTime: number,
-		nextBeat: { index: number; time: number },
-		beats: any[],
-		beatIndex: number,
-		config: SyncConfig
-	): { playbackRate: number; shouldSnap: boolean; snapTime: number; needsReset: boolean } {
-		const drops = APP_CONFIG.CAT_HEAD_DROPS
-		const duration = APP_CONFIG.VIDEO_DURATION
-
-		const dropIndex = nextBeat.index % drops.length
-		const currentDrop = drops[dropIndex]
-		const nextDrop = drops[(dropIndex + 1) % drops.length]
-
-		let dropDuration: number
-		if (nextDrop > currentDrop) {
-			dropDuration = nextDrop - currentDrop
-		} else {
-			dropDuration = duration - currentDrop + nextDrop
-		}
-
-		const beatProgress = (progressSec - beats[beatIndex].start) / dropDuration
-		const expectedTime = currentDrop + beatProgress * dropDuration
-
-		const wrappedExpected = expectedTime >= duration ? expectedTime - duration : expectedTime
-		const wrappedVideo =
-			currentVideoTime >= duration ? currentVideoTime - duration : currentVideoTime
-
-		let drift = wrappedVideo - wrappedExpected
-
-		if (Math.abs(drift) > duration / 2) {
-			drift = drift > 0 ? drift - duration : drift + duration
-		}
-
-		const absDrift = Math.abs(drift)
-		const maxCorrection = config.maxDriftCorrection
-		const aggressiveThreshold = (config as any).aggressiveSnapThreshold ?? 0.02
-
-		let snapRate = 1
-
-		if (absDrift > 1.5) {
-			this.state.playbackRate = 1
-			return {
-				playbackRate: 1,
-				shouldSnap: true,
-				snapTime: wrappedExpected,
-				needsReset: true,
-			}
-		}
-
-		if (absDrift > maxCorrection) {
-			const correctionStrength = absDrift > aggressiveThreshold ? 0.15 : 0.1
-			snapRate =
-				drift > 0
-					? 1 - Math.min(absDrift * correctionStrength, 0.2)
-					: 1 + Math.min(absDrift * correctionStrength, 0.2)
-		}
-
-		const lerpFactor = absDrift > maxCorrection ? 0.25 : 0.15
-		this.state.playbackRate = this.lerp(this.state.playbackRate, snapRate, lerpFactor)
-
-		return {
-			playbackRate: this.clamp(this.state.playbackRate, 0.85, 1.3),
-			shouldSnap: true,
-			snapTime: wrappedExpected,
-			needsReset: false,
-		}
-	}
-
-	private onBeatTransition(newBeatIndex: number, progressSec: number, config: SyncConfig): void {
-		if (this.state.lastBeatTime > 0) {
-			const dt = progressSec - this.state.lastBeatTime
-			if (dt > 0) {
-				const velocity = (this.state.playbackRate - 1) / dt
-				this.velocityHistory.push(velocity)
-				if (this.velocityHistory.length > this.velocityHistorySize) {
-					this.velocityHistory.shift()
-				}
-			}
-		}
-		this.state.lastBeatTime = progressSec
-	}
-
-	private calculateVelocityPrediction(targetRate: number, perfLevel: string): number {
-		if (this.velocityHistory.length < 2) return 0
-
-		const avgVelocity =
-			this.velocityHistory.reduce((a, b) => a + b, 0) / this.velocityHistory.length
-		const config = SYNC_CONFIGS[perfLevel] ?? SYNC_CONFIGS.high
-
-		return avgVelocity * config.velocityWeight
-	}
-
-	private calculateDrift(
-		currentVideoTime: number,
-		progressSec: number,
-		nextBeat: { index: number; time: number },
-		beats: any[],
-		beatIndex: number
-	): number {
-		const drops = APP_CONFIG.CAT_HEAD_DROPS
-		const duration = APP_CONFIG.VIDEO_DURATION
-
-		if (beatIndex < 0 || beatIndex >= beats.length) return 0
-
-		const dropIndex = nextBeat.index % drops.length
-		const currentDrop = drops[dropIndex]
-		const nextDrop = drops[(dropIndex + 1) % drops.length]
-
-		let dropDuration: number
-		if (nextDrop > currentDrop) {
-			dropDuration = nextDrop - currentDrop
-		} else {
-			dropDuration = duration - currentDrop + nextDrop
-		}
-
-		const beatDuration =
-			beatIndex < beats.length - 1 ? beats[beatIndex + 1].start - beats[beatIndex].start : 1
-
-		const timeSinceLastBeat = progressSec - beats[beatIndex].start
-		const beatProgress = Math.min(1, timeSinceLastBeat / beatDuration)
-
-		let expectedTime = currentDrop + beatProgress * dropDuration
-		if (expectedTime >= duration) {
-			expectedTime -= duration
-		}
-
-		return currentVideoTime - expectedTime
-	}
-
-	private smoothTransition(
-		current: number,
-		target: number,
-		config: SyncConfig,
-		velocityPrediction: number
-	): number {
-		const velocityAdjustedTarget = target + velocityPrediction
-		const adjustedTarget = this.clamp(velocityAdjustedTarget, 0.85, 1.3)
-		return this.lerp(current, adjustedTarget, config.lerpFactor)
-	}
-
-	private clampTargetRate(rate: number, config: SyncConfig): number {
-		return this.clamp(rate, 0.85, 1.3)
-	}
-
-	private clamp(value: number, min: number, max: number): number {
-		return Math.max(min, Math.min(max, value))
+		return duration - videoTime + drops[0]
 	}
 
 	private lerp(current: number, target: number, factor: number): number {

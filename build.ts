@@ -3,6 +3,8 @@ import { minify } from 'terser'
 import { writeFile, readFile } from 'fs/promises'
 import { join } from 'path'
 
+const pkg = JSON.parse(await readFile(join(process.cwd(), 'package.json'), 'utf-8'))
+
 const entryPoint = join(process.cwd(), 'src', 'app.tsx')
 const outDir = join(process.cwd(), 'dist')
 const outFile = join(outDir, 'cat-jam.js')
@@ -35,6 +37,7 @@ const esbuildConfig: BuildOptions = {
 	sourcemap: isWatch ? 'inline' : false,
 	define: {
 		'process.env.NODE_ENV': isWatch ? '"development"' : '"production"',
+		'__APP_VERSION__': JSON.stringify(pkg.version),
 	},
 	plugins: [spicetifyPlugin],
 }

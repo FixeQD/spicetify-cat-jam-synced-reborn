@@ -1,7 +1,7 @@
 import { APP_CONFIG } from './config'
 import { cachedSettings } from './settings'
 import { getAudioData, fetchAudioData } from './audio'
-import { syncEngine, SYNC_CONFIGS } from './sync-engine'
+import { syncEngine } from './sync-engine'
 import type { PerformanceLevel } from './performance'
 import { setupDebugTrigger } from './debug-overlay'
 
@@ -25,34 +25,6 @@ function calculateSmoothPlaybackRate(
 	const currentVideoTime = videoElement.currentTime
 
 	const result = syncEngine.update(progressSec, currentVideoTime, audioData, perfLevel)
-
-	if (result.needsReset) {
-		const videoDuration = APP_CONFIG.VIDEO_DURATION
-		if (result.snapTime !== undefined) {
-			let wrappedCurrent = currentVideoTime
-			if (wrappedCurrent >= videoDuration) wrappedCurrent -= videoDuration
-			const drift = wrappedCurrent - result.snapTime
-			if (Math.abs(drift) > 1.5) {
-				videoElement.currentTime = result.snapTime
-			}
-		}
-		syncEngine.reset()
-		return 1
-	}
-
-	if (result.shouldSnap && result.snapTime !== undefined) {
-		const videoDuration = APP_CONFIG.VIDEO_DURATION
-		let wrappedCurrent = currentVideoTime
-		if (wrappedCurrent >= videoDuration) wrappedCurrent -= videoDuration
-
-		const drift = wrappedCurrent - result.snapTime
-		if (Math.abs(drift) > 1.5) {
-			videoElement.currentTime = result.snapTime
-			syncEngine.reset()
-			return 1
-		}
-	}
-
 	return result.playbackRate
 }
 
@@ -69,28 +41,8 @@ export function syncTiming(startTime: number, progress: number) {
 	if (Spicetify.Player.isPlaying()) {
 		syncEngine.reset()
 		lastSyncBeatIndex = -1
-
-		const progressInSeconds = progress / 1000
-		const audioData = getAudioData()
-
-		if (audioData?.beats?.length) {
-			const upcomingBeat = audioData.beats.find((beat: any) => beat.start > progressInSeconds)
-			if (upcomingBeat) {
-				const operationTime = performance.now() - startTime
-				const delayUntilNextBeat = Math.max(
-					0,
-					(upcomingBeat.start - progressInSeconds) * 1000 - operationTime
-				)
-
-				setTimeout(() => {
-					videoElement?.play()
-				}, delayUntilNextBeat)
-			} else {
-				videoElement.play()
-			}
-		} else {
-			videoElement.play()
-		}
+		videoElement.currentTime = 0
+		videoElement.play()
 	} else {
 		videoElement.pause()
 	}

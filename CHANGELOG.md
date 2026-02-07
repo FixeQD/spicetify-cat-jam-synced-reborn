@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+### v2.5.0 (Sync Engine Rework) 🐱🔧
+
+- **Fixed sync loop dying**: `createTimedRAF` throttling was killing the RAF loop - skipped frames never scheduled the next `requestAnimationFrame`, freezing everything. Removed broken throttling, loop now runs every frame.
+- **Fixed onprogress resetting sync**: `onprogress` was calling `syncTiming()` every ~1s during normal playback, resetting the engine to 1x constantly. Now only resets on actual seeks (>3s jumps).
+- **Rewrote sync algorithm**: Both worker and fallback engine use the same simple formula - `timeUntilNextHeadDrop / timeUntilNextBeat`. Video time is wrapped with modulo for loop boundaries.
+- **Beat accuracy rewritten from scratch**: Old sliding window math was fundamentally broken - subtracting excess from hits caused accuracy to always decay to 0%. Now uses a proper ring buffer of 200 boolean results.
+- **Beat accuracy resets on song change**: No more stale accuracy data carrying over between tracks.
+- **Fixed dropped frames counter**: Was a monotonically increasing counter that never reset. Now counts drops in a 1-second sliding window. Only counts real drops (50ms+ gaps, not jitter). Properly calculates missed vsync slots.
+- **Fixed `shouldSkipFrame` bug**: Was comparing `performance.now()` timestamp (huge number) against a 33ms threshold. Never worked. Fixed to use actual frame delta.
+- **Fixed rate buffer stale detection**: `isStale()` was checking `lastOutputTime` which was only set by `getOutput()`. Debug overlay never called `getOutput()`, so stale was always true. Now checks newest buffer entry timestamp with a 500ms threshold.
+- **Tuned sync responsiveness**: Tighter playback rate clamp (0.75-1.35 instead of 0.7-1.5), higher lerp factors (0.25 instead of 0.15), wider rate buffer jump tolerance (0.5 instead of 0.3).
+- **Debug overlay improvements**: Live drift measurement (updated every frame, not just on beat transitions), target rate display, version number from package.json.
+
 ### v2.4.0 (Stats for Nerds) 🐱📊
 
 - **Debug Overlay**: Shift+click the cat to open a real-time debug panel showing everything happening under the hood.

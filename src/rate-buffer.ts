@@ -16,22 +16,22 @@ export const BUFFER_CONFIGS = {
 		maxBufferSize: 8,
 		maxAgeMs: 100,
 		interpolationThreshold: 0.02,
-		maxJumpRate: 0.15,
-		smoothFactor: 0.3,
+		maxJumpRate: 0.5,
+		smoothFactor: 0.6,
 	} as BufferConfig,
 	medium: {
 		maxBufferSize: 6,
 		maxAgeMs: 80,
 		interpolationThreshold: 0.03,
-		maxJumpRate: 0.12,
-		smoothFactor: 0.25,
+		maxJumpRate: 0.4,
+		smoothFactor: 0.5,
 	} as BufferConfig,
 	low: {
 		maxBufferSize: 4,
 		maxAgeMs: 60,
 		interpolationThreshold: 0.05,
-		maxJumpRate: 0.1,
-		smoothFactor: 0.2,
+		maxJumpRate: 0.35,
+		smoothFactor: 0.4,
 	} as BufferConfig,
 }
 
@@ -144,7 +144,8 @@ export class RateBuffer {
 
 	isStale(timestamp: number = performance.now()): boolean {
 		if (this.buffer.length === 0) return true
-		return timestamp - this.lastOutputTime > this.config.maxAgeMs
+		const newest = this.buffer[this.buffer.length - 1]
+		return timestamp - newest.timestamp > 500
 	}
 }
 
