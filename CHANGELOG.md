@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+### v2.5.1 (Drift & Accuracy Overhaul) 🎨🛠
+
+- Drift measurement fixed: video time is backtracked to the exact beat start before measuring drift, removing mid-beat bias.
+- Accuracy scoring overhauled: uses normalized drift against `MAX_DRIFT_MS` instead of a fixed 80ms hit threshold.
+- Accuracy window updated: ring buffer size now matches total track beats instead of a hardcoded 200.
+
 ### v2.5.0 (Sync Engine Rework) 🐱🔧
 
 - **Fixed sync loop dying**: `createTimedRAF` throttling was killing the RAF loop - skipped frames never scheduled the next `requestAnimationFrame`, freezing everything. Removed broken throttling, loop now runs every frame.

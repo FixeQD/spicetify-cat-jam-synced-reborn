@@ -19,8 +19,8 @@ let visible = false
 let animFrameId: number | null = null
 let lastMetrics: DebugMetrics = { progressMs: 0, perfLevel: 'high', workerActive: false }
 
-const ACCURACY_WINDOW = 200
-const HIT_THRESHOLD_MS = 80
+// max possible drift = half the average inter-drop gap
+const MAX_DRIFT_MS = ((APP_CONFIG.VIDEO_DURATION / APP_CONFIG.CAT_HEAD_DROPS.length) * 1000) / 2
 let driftHistory: number[] = []
 let lastMeasuredBeatIndex = -1
 
@@ -209,10 +209,19 @@ function renderContent(): string {
 	const liveDriftSec = measureDrift(videoTime)
 	const liveDriftMs = liveDriftSec * 1000
 
-	if (audioData?.beats?.length && beatIndex >= 0 && beatIndex !== lastMeasuredBeatIndex) {
+	const totalBeats = audioData?.beats?.length ?? 0
+
+	if (totalBeats > 0 && beatIndex >= 0 && beatIndex !== lastMeasuredBeatIndex) {
 		lastMeasuredBeatIndex = beatIndex
-		driftHistory.push(liveDriftMs)
-		if (driftHistory.length > ACCURACY_WINDOW) {
+
+		// backtrack video position to where it was at the exact beat start
+		const beatStart = audioData.beats[beatIndex].start
+		const timeSinceBeat = progressSec - beatStart
+		const correctedVideoTime = videoTime - timeSinceBeat * actualRate
+		const correctedDrift = measureDrift(correctedVideoTime) * 1000
+
+		driftHistory.push(correctedDrift)
+		if (driftHistory.length > totalBeats) {
 			driftHistory.shift()
 		}
 	}
@@ -243,17 +252,20 @@ function renderContent(): string {
 	html += row('Beat Drift', `${liveDriftMs.toFixed(1)}ms`, driftColor(liveDriftMs))
 
 	if (driftHistory.length > 0) {
-		const hits = driftHistory.filter((d) => d < HIT_THRESHOLD_MS).length
-		const accuracy = (hits / driftHistory.length) * 100
+		const totalScore = driftHistory.reduce(
+			(sum, d) => sum + Math.max(0, 1 - d / MAX_DRIFT_MS),
+			0
+		)
+		const accuracy = (totalScore / driftHistory.length) * 100
 		html += row(
 			'Beat Accuracy',
 			`${accuracy.toFixed(1)}% (last ${driftHistory.length})`,
-			accuracy > 85
+			accuracy >= 85
 				? '#4ade80'
-				: accuracy > 60
-					? '#facc15'
-					: accuracy >= 30
-						? undefined
+				: accuracy >= 35
+					? '#ffffff'
+					: accuracy >= 10
+						? '#facc15'
 						: '#f87171'
 		)
 	}
