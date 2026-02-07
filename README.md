@@ -4,6 +4,10 @@
 
 A reborn and optimized Cat-Jam experience, perfectly in sync with your beat. Make a cat appear next to your progress bar, jamming along with your music synchronized to the beat!
 
+Beat data (BPM, beat timestamps, segments, loudness) comes from Spotify's internal audio analysis API endpoint - it sometimes isn't perfect...
+
+**Shift+click the cat** to open the debug overlay with live sync stats, beat accuracy, drift, FPS, etc.
+
 ## Build & Installation
 
 ### Prerequisites
