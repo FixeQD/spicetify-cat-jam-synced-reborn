@@ -3,6 +3,7 @@ import { cachedSettings } from './settings'
 import { getAudioData, fetchAudioData } from './audio'
 import { syncEngine, SYNC_CONFIGS } from './sync-engine'
 import type { PerformanceLevel } from './performance'
+import { setupDebugTrigger } from './debug-overlay'
 
 let videoElement: HTMLVideoElement | null = null
 let lastSyncBeatIndex = -1
@@ -158,6 +159,8 @@ export async function createWebMVideo() {
 
 		videoElement.addEventListener('timeupdate', handleTimeUpdate)
 		videoElement.addEventListener('ended', handleEnded)
+
+		setupDebugTrigger(videoElement)
 
 		await fetchAudioData()
 		videoElement.playbackRate = 1

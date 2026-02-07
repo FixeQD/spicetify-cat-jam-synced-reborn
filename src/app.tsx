@@ -4,6 +4,7 @@ import { fetchAudioData, getPlaybackRate, getDynamicAnalysis, getAudioData } fro
 import { createWebMVideo, syncTiming, getVideoElement, syncVideoToMusicBeat } from './video'
 import { performanceMonitor, createTimedRAF } from './performance'
 import { getRateBuffer } from './rate-buffer'
+import { updateDebugMetrics } from './debug-overlay'
 
 async function main() {
 	console.log('[CAT-JAM] Extension initializing...')
@@ -257,6 +258,12 @@ async function main() {
 
 		const progress = Spicetify.Player.getProgress()
 		const perfLevel = performanceMonitor.getPerformanceLevel()
+
+		updateDebugMetrics({
+			progressMs: progress,
+			perfLevel,
+			workerActive: !!(worker && workerReady),
+		})
 
 		if (worker && workerReady) {
 			const audioData = getAudioData()

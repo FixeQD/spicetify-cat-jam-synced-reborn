@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+### v2.4.0 (Stats for Nerds) 🐱📊
+
+- **Debug Overlay**: Shift+click the cat to open a real-time debug panel showing everything happening under the hood.
+- **Live Metrics**: FPS, performance profile, playback rate, beat drift, loudness, local/global BPM, video sync state, rate buffer status
+- **Beat Accuracy Tracking**: Rolling accuracy percentage over the last 50 beats - see how well the cat is actually hitting them.
+- **Zero Overhead**: Overlay only runs its own RAF loop when visible. No performance cost when closed.
+
 ### v2.3.0 (Performance Boost) 🚀🎯
 
 - **Adaptive Performance System**: Added FPS-based throttling that adjusts update frequency based on system performance (low/medium/high modes).
