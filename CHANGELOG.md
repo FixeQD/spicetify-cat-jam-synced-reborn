@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+### v3.0.0 (Worker Refactor) 🔧
+
+- **Eliminated worker blob duplication**: Sync logic was previously copy-pasted as a raw string inside `worker-factory.ts`. Extracted into `src/sync/algorithm.ts` — pure functions (`computeNextRate`, `findNextBeat`, `getTimeUntilNextDrop`) shared by both the main thread engine and the worker.
+- **`processor.worker.ts` is now real TypeScript**: Imports directly from `../analyzer` and `../sync/algorithm`. Full type checking, no separate implementation to keep in sync.
+- **`workerBundlePlugin` in `build.ts`**: esbuild plugin that intercepts `?worker` imports, bundles the worker file as a self-contained IIFE, and inlines it as a string. Zero runtime overhead, no blob template literals.
+- **Worker receives config on init**: `createSyncWorker()` sends `maxScale` and `clampMax` from `cachedSettings` via a `setConfig` message instead of baking them into the blob at factory time.
+
 ### v2.7.1
 
 - Fixed all broken imports after folder restructuring. Renamed `debug-overlay.ts` → `overlay.ts` and `debug-renderer.ts` → `renderer.ts`.

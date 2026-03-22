@@ -1,9 +1,42 @@
 import { build, type BuildOptions, type Plugin } from 'esbuild'
 import { minify } from 'terser'
 import { writeFile, readFile, copyFile, mkdir } from 'fs/promises'
-import { join } from 'path'
+import { join, resolve } from 'path'
 import { homedir } from 'os'
 import { execSync, spawn } from 'child_process'
+
+const workerBundlePlugin: Plugin = {
+	name: 'worker-bundle',
+	setup(build) {
+		build.onResolve({ filter: /\?worker$/ }, (args) => ({
+			path: resolve(args.resolveDir, args.path.replace(/\?worker$/, '')),
+			namespace: 'worker-bundle',
+		}))
+
+		build.onLoad({ filter: /.*/, namespace: 'worker-bundle' }, async (args) => {
+			const result = await bundleWorkerFile(args.path)
+			return {
+				contents: `export default ${JSON.stringify(result)};`,
+				loader: 'js',
+			}
+		})
+	},
+}
+
+async function bundleWorkerFile(entryPoint: string): Promise<string> {
+	const result = await build({
+		entryPoints: [entryPoint],
+		bundle: true,
+		write: false,
+		format: 'iife',
+		platform: 'browser',
+		target: 'es2017',
+		define: {
+			'process.env.NODE_ENV': '"production"',
+		},
+	})
+	return result.outputFiles[0].text
+}
 
 const pkg = JSON.parse(await readFile(join(process.cwd(), 'package.json'), 'utf-8'))
 
@@ -59,7 +92,7 @@ const esbuildConfig: BuildOptions = {
 		'process.env.NODE_ENV': isWatch ? '"development"' : '"production"',
 		'__APP_VERSION__': JSON.stringify(pkg.version),
 	},
-	plugins: [spicetifyPlugin],
+	plugins: [spicetifyPlugin, workerBundlePlugin],
 }
 
 const runTerser = async () => {
