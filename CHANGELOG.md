@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+### v2.7.0 (Refactor) 🏗️
+
+- **Settings rewrite**: Dropped `spcr-settings` entirely. All settings now stored in `localStorage` and read via a `Proxy`-based `cachedSettings`. Custom settings popup replaces the Spotify settings panel.
+- **Project modularization**: Source reorganized into `audio/`, `sync/`, `video/`, `debug/`, and `settings/` folders. Worker blob extracted to `sync/worker-factory.ts`, player events to `sync/player-events.ts`, debug rendering to `debug/debug-renderer.ts`, and UI primitives to `settings/popup-ui.ts`.
+
 ### v2.6.0 (Party Mode) 🎉🌈
 
 - **Party Mode**: Rainbow disco overlay on the cat, activates at ≥130 BPM and ≥-10 dB. Follows the cat's exact WebM shape via canvas `destination-in` masking. Flashes on every beat, 1-second cooldown before deactivating.
