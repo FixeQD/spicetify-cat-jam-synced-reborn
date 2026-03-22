@@ -72,14 +72,31 @@ function createOverlayElement(): HTMLDivElement {
 			<span style="font-weight: 600; color: #fff; letter-spacing: 0.5px;">
 				Cat Jam Debug
 			</span>
-			<span style="
-				font-size: 9px;
-				color: rgba(255, 255, 255, 0.35);
-				letter-spacing: 0.3px;
-			">v${__APP_VERSION__} - drag to move</span>
+			<div style="display: flex; align-items: center; gap: 8px;">
+				<span style="
+					font-size: 9px;
+					color: rgba(255, 255, 255, 0.35);
+					letter-spacing: 0.3px;
+				">v${__APP_VERSION__} - drag to move</span>
+				<button id="catjam-debug-close" style="
+					background: none;
+					border: none;
+					color: rgba(255,255,255,0.35);
+					font-size: 13px;
+					cursor: pointer;
+					padding: 0;
+					line-height: 1;
+					display: flex;
+					align-items: center;
+				">✕</button>
+			</div>
 		</div>
 		<div id="catjam-debug-content" style="padding: 10px 12px;"></div>
 	`
+
+	el.querySelector('#catjam-debug-close')?.addEventListener('click', () => {
+		if (visible) toggleDebugOverlay()
+	})
 
 	setupDrag(el)
 	document.body.appendChild(el)

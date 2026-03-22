@@ -1,4 +1,5 @@
 import { APP_CONFIG } from './config'
+import { cachedSettings } from './settings'
 
 export interface SyncState {
 	playbackRate: number
@@ -64,7 +65,9 @@ export class PredictiveSyncEngine {
 		const timeUntilDrop = this.getTimeUntilNextDrop(videoTime, drops, duration)
 
 		const targetRate = timeUntilDrop / timeUntilBeat
-		const clampedTarget = Math.max(0.75, Math.min(1.35, targetRate))
+		const clampMax = cachedSettings.syncClampMax ?? 1.35
+		const clampMin = 2 - clampMax
+		const clampedTarget = Math.max(clampMin, Math.min(clampMax, targetRate))
 
 		this.state.playbackRate = this.lerp(this.state.playbackRate, clampedTarget, lerpFactor)
 

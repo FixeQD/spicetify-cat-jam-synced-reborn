@@ -1,6 +1,8 @@
 import { getAudioData } from './audio'
 import { getLoudnessAt, normalizeLoudness, getInstantBPM } from './analyzer'
+import { cachedSettings } from './settings'
 
+// fallback constants — actual values come from cachedSettings at runtime
 export const PARTY_BPM_THRESHOLD = 130
 export const PARTY_LOUDNESS_THRESHOLD_DB = -10
 const OPACITY_SMOOTHING = 0.04
@@ -40,8 +42,11 @@ export function updatePartyMode(videoElement: HTMLVideoElement, progressMs: numb
 	const bpm = (getInstantBPM(audioData.beats, progressSec) || audioData.track?.tempo) ?? 0
 
 	const now = performance.now()
-	if (bpm >= PARTY_BPM_THRESHOLD && loudnessDb >= PARTY_LOUDNESS_THRESHOLD_DB) {
-		partyActiveUntil = now + 1000
+	const bpmThreshold = cachedSettings.partyBpmThreshold as number
+	const loudnessThreshold = cachedSettings.partyLoudnessDb as number
+	if (bpm >= bpmThreshold && loudnessDb >= loudnessThreshold) {
+		const cooldown = cachedSettings.partyCooldownMs ?? 1000
+		partyActiveUntil = now + cooldown
 	}
 	const shouldBeActive = now < partyActiveUntil
 	_lastBpm = bpm
@@ -122,6 +127,8 @@ export function updatePartyMode(videoElement: HTMLVideoElement, progressMs: numb
 	ctx.fillStyle = gradient
 	ctx.fillRect(0, 0, w, h)
 
+	// mask to cat shape: draw video on top with destination-in
+	// this keeps gradient pixels only where the video has alpha > 0
 	ctx.globalCompositeOperation = 'destination-in'
 	ctx.drawImage(videoElement, 0, 0, w, h)
 	ctx.globalCompositeOperation = 'source-over'
@@ -145,4 +152,5 @@ export function destroyPartyOverlay() {
 	flashIntensity = 0
 	lastBeatIndex = -1
 	hueOffset = 0
+	partyActiveUntil = 0
 }

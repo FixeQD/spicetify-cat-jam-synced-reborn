@@ -3,7 +3,6 @@ import { cachedSettings } from './settings'
 import { getAudioData, fetchAudioData } from './audio'
 import { syncEngine } from './sync-engine'
 import type { PerformanceLevel } from './performance'
-import { setupDebugTrigger } from './debug-overlay'
 
 let videoElement: HTMLVideoElement | null = null
 let lastSyncBeatIndex = -1
@@ -66,12 +65,14 @@ export async function createWebMVideo() {
 		const isBottom = cachedSettings.position === APP_CONFIG.LABELS.POSITION.BOTTOM
 		const videoDuration = APP_CONFIG.VIDEO_DURATION
 
+		const sz = `${cachedSettings.catSize ?? 65}px`
 		const leftLibraryStyle = `width: ${cachedSettings.size}%; max-width: ${APP_CONFIG.STYLES.MAX_LIBRARY_WIDTH}; height: auto; max-height: 100%; position: absolute; bottom: 0; pointer-events: none; z-index: 1;`
+		const bottomStyle = `width: ${sz}; height: ${sz};`
 
 		const targetElementSelector = isBottom
 			? APP_CONFIG.SELECTORS.BOTTOM_PLAYER
 			: APP_CONFIG.SELECTORS.LEFT_LIBRARY
-		const elementStyles = isBottom ? APP_CONFIG.STYLES.BOTTOM_PLAYER : leftLibraryStyle
+		const elementStyles = isBottom ? bottomStyle : leftLibraryStyle
 
 		const targetElement = await waitForElement(targetElementSelector)
 
@@ -111,8 +112,6 @@ export async function createWebMVideo() {
 
 		videoElement.addEventListener('timeupdate', handleTimeUpdate)
 		videoElement.addEventListener('ended', handleEnded)
-
-		setupDebugTrigger(videoElement)
 
 		await fetchAudioData()
 		videoElement.playbackRate = 1

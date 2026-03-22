@@ -1,11 +1,12 @@
 import { APP_CONFIG } from './config'
-import { settings, SETTINGS_SCHEMA } from './settings'
+import { cachedSettings } from './settings'
 import { fetchAudioData, getPlaybackRate, getDynamicAnalysis, getAudioData } from './audio'
 import { createWebMVideo, syncTiming, getVideoElement, syncVideoToMusicBeat } from './video'
 import { performanceMonitor, createTimedRAF } from './performance'
 import { getRateBuffer } from './rate-buffer'
 import { updateDebugMetrics, resetBeatAccuracy } from './debug-overlay'
 import { updatePartyMode, destroyPartyOverlay } from './party-mode'
+import { setupSettingsTrigger } from './settings-popup'
 
 async function main() {
 	console.log('[CAT-JAM] Extension initializing...')
@@ -13,21 +14,12 @@ async function main() {
 		await new Promise((resolve) => setTimeout(resolve, APP_CONFIG.DEFAULTS.SYNC_INTERVAL))
 	}
 
-	Object.values(SETTINGS_SCHEMA).forEach((field) => {
-		if (field.type === 'input' || field.type === 'number') {
-			settings.addInput(field.id, field.label, String(field.default))
-		} else if (field.type === 'dropdown') {
-			settings.addDropDown(field.id, field.label, field.options as any, 0)
-		}
-	})
-
-	settings.addButton('catjam-reload', 'Reload', 'Save and reload', () => {
-		createWebMVideo()
-	})
-
-	settings.pushSettings()
-
 	await createWebMVideo()
+
+	const videoEl = getVideoElement()
+	if (videoEl) {
+		setupSettingsTrigger(videoEl, () => createWebMVideo())
+	}
 
 	let animationId: number | null = null
 
@@ -43,7 +35,9 @@ async function main() {
 				`(${(() => {
 					const CAT_HEAD_DROPS = APP_CONFIG.CAT_HEAD_DROPS
 					const VIDEO_DURATION = APP_CONFIG.VIDEO_DURATION
-					const MAX_SCALE = APP_CONFIG.VISUAL.MAX_SCALE
+					const MAX_SCALE = cachedSettings.pulseIntensity ?? APP_CONFIG.VISUAL.MAX_SCALE
+					const SYNC_CLAMP_MAX = cachedSettings.syncClampMax ?? 1.35
+					const SYNC_CLAMP_MIN = 2 - SYNC_CLAMP_MAX // symmetric: 1.35 → 0.65
 
 					const LERP_FACTORS: Record<string, number> = {
 						high: 0.25,
@@ -130,7 +124,7 @@ async function main() {
 						const timeUntilDrop = getTimeUntilNextDrop(videoTime)
 
 						const targetRate = timeUntilDrop / timeUntilBeat
-						const clampedTarget = clamp(targetRate, 0.75, 1.35)
+						const clampedTarget = clamp(targetRate, SYNC_CLAMP_MIN, SYNC_CLAMP_MAX)
 
 						currentRate = lerp(currentRate, clampedTarget, lerpFactor)
 
@@ -271,7 +265,9 @@ async function main() {
 			const videoElement = getVideoElement()
 
 			if (videoElement) {
-				const scale = 1 + loudness * (APP_CONFIG.VISUAL.MAX_SCALE - 1)
+				const scale =
+					1 +
+					loudness * ((cachedSettings.pulseIntensity ?? APP_CONFIG.VISUAL.MAX_SCALE) - 1)
 				videoElement.style.transform = `scale(${scale})`
 				updateDebugMetrics({ targetRate: videoElement.playbackRate })
 			}
@@ -279,6 +275,7 @@ async function main() {
 
 		animationId = requestAnimationFrame(updateLoop)
 
+		// party mode — runs every frame, self-throttles internally
 		const videoEl = getVideoElement()
 		if (videoEl) updatePartyMode(videoEl, progress)
 	})
