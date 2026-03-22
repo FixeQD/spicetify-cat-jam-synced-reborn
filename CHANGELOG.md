@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+### v2.7.1
+
+- Fixed all broken imports after folder restructuring. Renamed `debug-overlay.ts` → `overlay.ts` and `debug-renderer.ts` → `renderer.ts`.
+
 ### v2.7.0 (Refactor) 🏗️
 
 - **Settings rewrite**: Dropped `spcr-settings` entirely. All settings now stored in `localStorage` and read via a `Proxy`-based `cachedSettings`. Custom settings popup replaces the Spotify settings panel.
