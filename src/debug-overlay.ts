@@ -4,6 +4,7 @@ import { getAudioData } from './audio'
 import { getLocalBPM, getLoudnessAt, normalizeLoudness } from './analyzer'
 import { APP_CONFIG } from './config'
 import { getVideoElement } from './video'
+import { getPartyModeState, PARTY_BPM_THRESHOLD, PARTY_LOUDNESS_THRESHOLD_DB } from './party-mode'
 
 declare const __APP_VERSION__: string
 
@@ -301,10 +302,9 @@ function renderContent(): string {
 
 		// next head drop
 		const drops = APP_CONFIG.CAT_HEAD_DROPS
-		const nextDrop = drops.find((d) => d > video.currentTime)
-		const timeUntilDrop = nextDrop
-			? nextDrop - video.currentTime
-			: APP_CONFIG.VIDEO_DURATION - video.currentTime + drops[0]
+		const vt = video.currentTime % APP_CONFIG.VIDEO_DURATION
+		const nextDrop = drops.find((d) => d > vt)
+		const timeUntilDrop = nextDrop ? nextDrop - vt : APP_CONFIG.VIDEO_DURATION - vt + drops[0]
 		html += row('Next Head Drop', `in ${(timeUntilDrop * 1000).toFixed(0)}ms`)
 	}
 
@@ -324,6 +324,22 @@ function renderContent(): string {
 		'Progress',
 		`${pMin}:${String(pSec).padStart(2, '0')} / ${tMin}:${String(tSec).padStart(2, '0')}`
 	)
+
+	html += separator('PARTY MODE')
+	const party = getPartyModeState()
+	html += row('Active', party.active ? 'YES' : 'NO', party.active ? '#e879f9' : '#4ade80')
+	html += row(
+		'BPM',
+		`${party.bpm.toFixed(1)} / ${PARTY_BPM_THRESHOLD}`,
+		party.bpm >= PARTY_BPM_THRESHOLD ? '#e879f9' : 'rgba(255,255,255,0.4)'
+	)
+	html += row(
+		'Loudness',
+		`${party.loudnessDb.toFixed(1)}dB / ${PARTY_LOUDNESS_THRESHOLD_DB}dB`,
+		party.loudnessDb >= PARTY_LOUDNESS_THRESHOLD_DB ? '#e879f9' : 'rgba(255,255,255,0.4)'
+	)
+	html += row('Opacity', party.opacity.toFixed(3), party.active ? '#e879f9' : undefined)
+	html += row('Flash', party.flash.toFixed(3))
 
 	return html
 }

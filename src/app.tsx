@@ -5,6 +5,7 @@ import { createWebMVideo, syncTiming, getVideoElement, syncVideoToMusicBeat } fr
 import { performanceMonitor, createTimedRAF } from './performance'
 import { getRateBuffer } from './rate-buffer'
 import { updateDebugMetrics, resetBeatAccuracy } from './debug-overlay'
+import { updatePartyMode, destroyPartyOverlay } from './party-mode'
 
 async function main() {
 	console.log('[CAT-JAM] Extension initializing...')
@@ -277,6 +278,9 @@ async function main() {
 		}
 
 		animationId = requestAnimationFrame(updateLoop)
+
+		const videoEl = getVideoElement()
+		if (videoEl) updatePartyMode(videoEl, progress)
 	})
 
 	const startLoop = () => {
@@ -318,6 +322,7 @@ async function main() {
 		getRateBuffer('medium').clear()
 		getRateBuffer('low').clear()
 		resetBeatAccuracy()
+		destroyPartyOverlay()
 
 		const startTime = performance.now()
 		const audioData = await fetchAudioData()

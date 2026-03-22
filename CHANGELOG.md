@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+### v2.6.0 (Party Mode) 🎉🌈
+
+- **Party Mode**: Rainbow disco overlay on the cat, activates at ≥130 BPM and ≥-10 dB. Follows the cat's exact WebM shape via canvas `destination-in` masking. Flashes on every beat, 1-second cooldown before deactivating.
+- **Instant BPM**: New `getInstantBPM()` based on last 6 beat intervals with median filtering — reacts in under a second.
+- **BPM overhaul**: `getLocalBPM()` now uses a trailing window, confidence weighting, and outlier rejection.
+- **Debug overlay**: New PARTY MODE section with live BPM/loudness gate indicators. Fixed Next Head Drop countdown after first video loop.
+- **Watch mode**: `bun watch` now auto-registers the extension and copies to Spicetify's Extensions folder before starting `spicetify watch -e`.
+
 ### v2.5.1 (Drift & Accuracy Overhaul) 🎨🛠
 
 - Drift measurement fixed: video time is backtracked to the exact beat start before measuring drift, removing mid-beat bias.

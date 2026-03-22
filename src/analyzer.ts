@@ -39,24 +39,77 @@ export function getLoudnessAt(segments: any[], timeSec: number): number {
 	}
 }
 
-export function getLocalBPM(beats: any[], timeSec: number, windowSeconds: number = 6): number {
-	if (!beats || beats.length < 2) return 0
-
-	const start = timeSec - windowSeconds / 2
-	const end = timeSec + windowSeconds / 2
-
-	const localBeats = beats.filter((b) => b.start >= start && b.start <= end)
-
-	if (localBeats.length < 2) return 0
-
-	const totalInterval = localBeats[localBeats.length - 1].start - localBeats[0].start
-	const avgInterval = totalInterval / (localBeats.length - 1)
-
-	return 60 / avgInterval
-}
-
 export function normalizeLoudness(db: number): number {
 	const min = -60
 	const max = 0
 	return Math.max(0, Math.min(1, (db - min) / (max - min)))
+}
+
+export function getLocalBPM(beats: any[], timeSec: number, windowSeconds: number = 8): number {
+	if (!beats || beats.length < 2) return 0
+
+	const windowStart = timeSec - windowSeconds
+	const localBeats = beats.filter((b) => b.start >= windowStart && b.start <= timeSec)
+
+	if (localBeats.length < 2) {
+		const nearby = beats.slice(0, Math.min(8, beats.length))
+		if (nearby.length < 2) return 0
+		const totalInterval = nearby[nearby.length - 1].start - nearby[0].start
+		return 60 / (totalInterval / (nearby.length - 1))
+	}
+
+	const intervals: { bpm: number; weight: number }[] = []
+	for (let i = 1; i < localBeats.length; i++) {
+		const interval = localBeats[i].start - localBeats[i - 1].start
+		if (interval <= 0) continue
+		const bpm = 60 / interval
+		if (bpm < 50 || bpm > 300) continue
+		const weight = (localBeats[i].confidence ?? 1) + (localBeats[i - 1].confidence ?? 1)
+		intervals.push({ bpm, weight })
+	}
+
+	if (intervals.length === 0) return 0
+
+	const sorted = [...intervals].sort((a, b) => a.bpm - b.bpm)
+	const medianBpm = sorted[Math.floor(sorted.length / 2)].bpm
+	const filtered = intervals.filter(
+		(iv) => iv.bpm >= medianBpm * 0.75 && iv.bpm <= medianBpm * 1.25
+	)
+
+	const pool = filtered.length > 0 ? filtered : intervals
+
+	let sumW = 0
+	let sumBpm = 0
+	for (const iv of pool) {
+		sumBpm += iv.bpm * iv.weight
+		sumW += iv.weight
+	}
+
+	return sumW > 0 ? sumBpm / sumW : medianBpm
+}
+
+// BPM from the last N beat intervals — reacts in under a second
+export function getInstantBPM(beats: any[], timeSec: number, beatCount: number = 6): number {
+	if (!beats || beats.length < 2) return 0
+
+	let idx = -1
+	for (let i = beats.length - 1; i >= 0; i--) {
+		if (beats[i].start <= timeSec) {
+			idx = i
+			break
+		}
+	}
+	if (idx < 1) return 0
+
+	const from = Math.max(1, idx - beatCount + 1)
+	const intervals: number[] = []
+	for (let i = from; i <= idx; i++) {
+		const interval = beats[i].start - beats[i - 1].start
+		if (interval > 0) intervals.push(interval)
+	}
+	if (intervals.length === 0) return 0
+
+	intervals.sort((a, b) => a - b)
+	const median = intervals[Math.floor(intervals.length / 2)]
+	return 60 / median
 }
