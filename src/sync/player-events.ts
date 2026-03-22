@@ -1,15 +1,12 @@
-import { fetchAudioData } from './audio'
-import { syncTiming, getVideoElement } from './video'
+import { fetchAudioData } from '../audio/audio'
+import { syncTiming, getVideoElement } from '../video/video'
 import { getRateBuffer } from './rate-buffer'
-import { resetBeatAccuracy } from './debug-overlay'
-import { destroyPartyOverlay } from './party-mode'
+import { resetBeatAccuracy } from '../debug/overlay'
+import { destroyPartyOverlay } from '../video/party-mode'
 
 type WorkerRef = { worker: Worker | null; ready: boolean }
 
-export function registerPlayerEvents(
-	workerRef: WorkerRef,
-	startLoop: () => void
-) {
+export function registerPlayerEvents(workerRef: WorkerRef, startLoop: () => void) {
 	function clearBuffers() {
 		getRateBuffer('high').clear()
 		getRateBuffer('medium').clear()
@@ -51,8 +48,14 @@ export function registerPlayerEvents(
 		videoElement.playbackRate = 1
 
 		if (audioData?.beats?.length) {
-			const delay = Math.max(0, audioData.beats[0].start * 1000 - (performance.now() - startTime))
-			setTimeout(() => { getVideoElement()?.play(); startLoop() }, delay)
+			const delay = Math.max(
+				0,
+				audioData.beats[0].start * 1000 - (performance.now() - startTime)
+			)
+			setTimeout(() => {
+				getVideoElement()?.play()
+				startLoop()
+			}, delay)
 		} else {
 			videoElement.play()
 			startLoop()

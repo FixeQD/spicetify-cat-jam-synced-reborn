@@ -1,4 +1,4 @@
-import { renderDebugContent, resetBeatAccuracy as _resetBeatAccuracy } from './debug-renderer'
+import { renderDebugContent, resetBeatAccuracy as _resetBeatAccuracy } from './renderer'
 
 declare const __APP_VERSION__: string
 
@@ -79,7 +79,9 @@ function createOverlayElement(): HTMLDivElement {
 function setupDrag(el: HTMLDivElement) {
 	const header = el.querySelector('#catjam-debug-header') as HTMLElement
 	if (!header) return
-	let dragging = false, ox = 0, oy = 0
+	let dragging = false,
+		ox = 0,
+		oy = 0
 	header.addEventListener('mousedown', (e: MouseEvent) => {
 		if (e.button !== 0) return
 		dragging = true
@@ -91,9 +93,14 @@ function setupDrag(el: HTMLDivElement) {
 	document.addEventListener('mousemove', (e: MouseEvent) => {
 		if (!dragging) return
 		el.style.left = `${Math.max(0, Math.min(window.innerWidth - el.offsetWidth, e.clientX - ox))}px`
-		el.style.top  = `${Math.max(0, Math.min(window.innerHeight - el.offsetHeight, e.clientY - oy))}px`
+		el.style.top = `${Math.max(0, Math.min(window.innerHeight - el.offsetHeight, e.clientY - oy))}px`
 	})
-	document.addEventListener('mouseup', () => { if (dragging) { dragging = false; header.style.cursor = 'grab' } })
+	document.addEventListener('mouseup', () => {
+		if (dragging) {
+			dragging = false
+			header.style.cursor = 'grab'
+		}
+	})
 }
 
 // ─── RAF loop ────────────────────────────────────────────────────────────────
@@ -120,7 +127,10 @@ export function toggleDebugOverlay() {
 		console.log('[CAT-JAM] Debug overlay enabled')
 	} else {
 		overlay?.style && (overlay.style.display = 'none')
-		if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null }
+		if (animFrameId) {
+			cancelAnimationFrame(animFrameId)
+			animFrameId = null
+		}
 		console.log('[CAT-JAM] Debug overlay disabled')
 	}
 }

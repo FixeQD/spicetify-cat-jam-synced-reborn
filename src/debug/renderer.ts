@@ -1,11 +1,15 @@
-import { performanceMonitor } from './performance'
-import { getRateBuffer } from './rate-buffer'
-import { getAudioData } from './audio'
-import { getLocalBPM, getLoudnessAt, normalizeLoudness } from './analyzer'
-import { APP_CONFIG } from './config'
-import { getVideoElement } from './video'
-import { getPartyModeState, PARTY_BPM_THRESHOLD, PARTY_LOUDNESS_THRESHOLD_DB } from './party-mode'
-import type { DebugMetrics } from './debug-overlay'
+import { performanceMonitor } from '../performance'
+import { getRateBuffer } from '../sync/rate-buffer'
+import { getAudioData } from '../audio/audio'
+import { getLocalBPM, getLoudnessAt, normalizeLoudness } from '../audio/analyzer'
+import { APP_CONFIG } from '../config'
+import { getVideoElement } from '../video/video'
+import {
+	getPartyModeState,
+	PARTY_BPM_THRESHOLD,
+	PARTY_LOUDNESS_THRESHOLD_DB,
+} from '../video/party-mode'
+import type { DebugMetrics } from '../debug/overlay'
 
 const MAX_DRIFT_MS = ((APP_CONFIG.VIDEO_DURATION / APP_CONFIG.CAT_HEAD_DROPS.length) * 1000) / 2
 let driftHistory: number[] = []
@@ -86,7 +90,10 @@ export function renderDebugContent(lastMetrics: DebugMetrics): string {
 	let beatIndex = -1
 	if (audioData?.beats?.length) {
 		for (let i = audioData.beats.length - 1; i >= 0; i--) {
-			if (audioData.beats[i].start <= progressSec) { beatIndex = i; break }
+			if (audioData.beats[i].start <= progressSec) {
+				beatIndex = i
+				break
+			}
 		}
 	}
 
@@ -106,20 +113,38 @@ export function renderDebugContent(lastMetrics: DebugMetrics): string {
 	html += row('FPS', perf.fps.toFixed(1), perfLevelColor(perf.level))
 	html += row('Profile', perf.level.toUpperCase(), perfLevelColor(perf.level))
 	html += row('Frame Time', perf.avgFrameTime.toFixed(1) + 'ms')
-	html += row('Dropped Frames', String(perf.droppedFrames), perf.droppedFrames > 10 ? '#f87171' : undefined)
-	html += row('Worker', workerActive ? 'ACTIVE' : 'MAIN THREAD', workerActive ? '#4ade80' : '#facc15')
+	html += row(
+		'Dropped Frames',
+		String(perf.droppedFrames),
+		perf.droppedFrames > 10 ? '#f87171' : undefined
+	)
+	html += row(
+		'Worker',
+		workerActive ? 'ACTIVE' : 'MAIN THREAD',
+		workerActive ? '#4ade80' : '#facc15'
+	)
 
 	html += separator('SYNC ENGINE')
 	html += row('Actual Rate', actualRate.toFixed(3) + 'x')
-	if (lastMetrics.targetRate !== undefined) html += row('Target Rate', lastMetrics.targetRate.toFixed(3) + 'x', '#60a5fa')
+	if (lastMetrics.targetRate !== undefined)
+		html += row('Target Rate', lastMetrics.targetRate.toFixed(3) + 'x', '#60a5fa')
 	html += row('Beat Index', String(beatIndex))
 	html += row('Beat Drift', `${liveDriftMs.toFixed(1)}ms`, driftColor(liveDriftMs))
 	if (driftHistory.length > 0) {
-		const accuracy = (driftHistory.reduce((s, d) => s + Math.max(0, 1 - d / MAX_DRIFT_MS), 0) / driftHistory.length) * 100
+		const accuracy =
+			(driftHistory.reduce((s, d) => s + Math.max(0, 1 - d / MAX_DRIFT_MS), 0) /
+				driftHistory.length) *
+			100
 		html += row(
 			'Beat Accuracy',
 			`${accuracy.toFixed(1)}% (last ${driftHistory.length})`,
-			accuracy >= 85 ? '#4ade80' : accuracy >= 35 ? '#ffffff' : accuracy >= 10 ? '#facc15' : '#f87171'
+			accuracy >= 85
+				? '#4ade80'
+				: accuracy >= 35
+					? '#ffffff'
+					: accuracy >= 10
+						? '#facc15'
+						: '#f87171'
 		)
 	}
 
@@ -128,7 +153,11 @@ export function renderDebugContent(lastMetrics: DebugMetrics): string {
 		const globalBPM = audioData.track?.tempo ?? 0
 		const localBPM = getLocalBPM(audioData.beats, progressSec) || globalBPM
 		html += row('Global BPM', globalBPM.toFixed(1))
-		html += row('Local BPM', localBPM.toFixed(1), localBPM !== globalBPM ? '#60a5fa' : undefined)
+		html += row(
+			'Local BPM',
+			localBPM.toFixed(1),
+			localBPM !== globalBPM ? '#60a5fa' : undefined
+		)
 		const loudnessDb = getLoudnessAt(audioData.segments, progressSec)
 		const scale = 1 + normalizeLoudness(loudnessDb) * (APP_CONFIG.VISUAL.MAX_SCALE - 1)
 		html += row('Loudness', loudnessDb.toFixed(1) + 'dB')
@@ -145,7 +174,9 @@ export function renderDebugContent(lastMetrics: DebugMetrics): string {
 		html += row('Paused', video.paused ? 'YES' : 'NO', video.paused ? '#f87171' : '#4ade80')
 		const vt = video.currentTime % APP_CONFIG.VIDEO_DURATION
 		const nextDrop = APP_CONFIG.CAT_HEAD_DROPS.find((d) => d > vt)
-		const timeUntilDrop = nextDrop ? nextDrop - vt : APP_CONFIG.VIDEO_DURATION - vt + APP_CONFIG.CAT_HEAD_DROPS[0]
+		const timeUntilDrop = nextDrop
+			? nextDrop - vt
+			: APP_CONFIG.VIDEO_DURATION - vt + APP_CONFIG.CAT_HEAD_DROPS[0]
 		html += row('Next Head Drop', `in ${(timeUntilDrop * 1000).toFixed(0)}ms`)
 	}
 
@@ -159,13 +190,24 @@ export function renderDebugContent(lastMetrics: DebugMetrics): string {
 	const pSec = Math.floor((progressMs % 60000) / 1000)
 	const tMin = Math.floor(totalMs / 60000)
 	const tSec = Math.floor((totalMs % 60000) / 1000)
-	html += row('Progress', `${pMin}:${String(pSec).padStart(2, '0')} / ${tMin}:${String(tSec).padStart(2, '0')}`)
+	html += row(
+		'Progress',
+		`${pMin}:${String(pSec).padStart(2, '0')} / ${tMin}:${String(tSec).padStart(2, '0')}`
+	)
 
 	html += separator('PARTY MODE')
 	const party = getPartyModeState()
 	html += row('Active', party.active ? 'YES' : 'NO', party.active ? '#e879f9' : '#4ade80')
-	html += row('BPM', `${party.bpm.toFixed(1)} / ${PARTY_BPM_THRESHOLD}`, party.bpm >= PARTY_BPM_THRESHOLD ? '#e879f9' : 'rgba(255,255,255,0.4)')
-	html += row('Loudness', `${party.loudnessDb.toFixed(1)}dB / ${PARTY_LOUDNESS_THRESHOLD_DB}dB`, party.loudnessDb >= PARTY_LOUDNESS_THRESHOLD_DB ? '#e879f9' : 'rgba(255,255,255,0.4)')
+	html += row(
+		'BPM',
+		`${party.bpm.toFixed(1)} / ${PARTY_BPM_THRESHOLD}`,
+		party.bpm >= PARTY_BPM_THRESHOLD ? '#e879f9' : 'rgba(255,255,255,0.4)'
+	)
+	html += row(
+		'Loudness',
+		`${party.loudnessDb.toFixed(1)}dB / ${PARTY_LOUDNESS_THRESHOLD_DB}dB`,
+		party.loudnessDb >= PARTY_LOUDNESS_THRESHOLD_DB ? '#e879f9' : 'rgba(255,255,255,0.4)'
+	)
 	html += row('Opacity', party.opacity.toFixed(3), party.active ? '#e879f9' : undefined)
 	html += row('Flash', party.flash.toFixed(3))
 

@@ -1,5 +1,5 @@
 import { SETTINGS_SCHEMA } from './settings'
-import { toggleDebugOverlay, isDebugVisible } from '../debug/debug-overlay'
+import { toggleDebugOverlay, isDebugVisible } from '../debug/overlay'
 import { numberControl, settingsRow, settingsSection, actionBtn } from './popup-ui'
 
 declare const __APP_VERSION__: string
@@ -49,7 +49,8 @@ function buildPopup(): HTMLDivElement {
 	ver.style.cssText = 'font-size: 9px; color: rgba(255,255,255,0.25); letter-spacing: 0.3px;'
 	const closeBtn = document.createElement('button')
 	closeBtn.textContent = '✕'
-	closeBtn.style.cssText = 'background:none;border:none;color:rgba(255,255,255,0.3);font-size:12px;cursor:pointer;padding:0;line-height:1;font-family:inherit;'
+	closeBtn.style.cssText =
+		'background:none;border:none;color:rgba(255,255,255,0.3);font-size:12px;cursor:pointer;padding:0;line-height:1;font-family:inherit;'
 	closeBtn.addEventListener('mouseenter', () => (closeBtn.style.color = '#fff'))
 	closeBtn.addEventListener('mouseleave', () => (closeBtn.style.color = 'rgba(255,255,255,0.3)'))
 	closeBtn.addEventListener('click', closePopup)
@@ -63,15 +64,37 @@ function buildPopup(): HTMLDivElement {
 
 	body.appendChild(settingsSection('🐱', 'Cat'))
 	body.appendChild(settingsRow('Size', numberControl(s.catSize.id, s.catSize.default, 'px')))
-	body.appendChild(settingsRow('Pulse intensity', numberControl(s.pulseIntensity.id, s.pulseIntensity.default, '×')))
+	body.appendChild(
+		settingsRow(
+			'Pulse intensity',
+			numberControl(s.pulseIntensity.id, s.pulseIntensity.default, '×')
+		)
+	)
 
 	body.appendChild(settingsSection('⚙', 'Sync'))
-	body.appendChild(settingsRow('Aggressiveness', numberControl(s.syncClampMax.id, s.syncClampMax.default, '×')))
+	body.appendChild(
+		settingsRow('Aggressiveness', numberControl(s.syncClampMax.id, s.syncClampMax.default, '×'))
+	)
 
 	body.appendChild(settingsSection('🎉', 'Party Mode'))
-	body.appendChild(settingsRow('BPM threshold', numberControl(s.partyBpmThreshold.id, s.partyBpmThreshold.default, 'BPM')))
-	body.appendChild(settingsRow('Loudness threshold', numberControl(s.partyLoudnessDb.id, s.partyLoudnessDb.default, 'dB')))
-	body.appendChild(settingsRow('Cooldown', numberControl(s.partyCooldownMs.id, s.partyCooldownMs.default, 'ms')))
+	body.appendChild(
+		settingsRow(
+			'BPM threshold',
+			numberControl(s.partyBpmThreshold.id, s.partyBpmThreshold.default, 'BPM')
+		)
+	)
+	body.appendChild(
+		settingsRow(
+			'Loudness threshold',
+			numberControl(s.partyLoudnessDb.id, s.partyLoudnessDb.default, 'dB')
+		)
+	)
+	body.appendChild(
+		settingsRow(
+			'Cooldown',
+			numberControl(s.partyCooldownMs.id, s.partyCooldownMs.default, 'ms')
+		)
+	)
 
 	// footer
 	const footer = document.createElement('div')
@@ -84,13 +107,20 @@ function buildPopup(): HTMLDivElement {
 		border-radius: 0 0 8px 8px;
 	`
 
-	const saveBtn = actionBtn('Save & Reload', () => { onSave?.(); closePopup() })
+	const saveBtn = actionBtn('Save & Reload', () => {
+		onSave?.()
+		closePopup()
+	})
 	saveBtn.style.flex = '1'
 
-	const debugBtn = actionBtn(isDebugVisible() ? 'Hide Debug' : 'Debug', () => {
-		toggleDebugOverlay()
-		debugBtn.textContent = isDebugVisible() ? 'Hide Debug' : 'Debug'
-	}, true)
+	const debugBtn = actionBtn(
+		isDebugVisible() ? 'Hide Debug' : 'Debug',
+		() => {
+			toggleDebugOverlay()
+			debugBtn.textContent = isDebugVisible() ? 'Hide Debug' : 'Debug'
+		},
+		true
+	)
 
 	footer.append(saveBtn, debugBtn)
 	el.append(header, body, footer)
@@ -99,26 +129,35 @@ function buildPopup(): HTMLDivElement {
 }
 
 function setupDrag(el: HTMLDivElement, handle: HTMLElement) {
-	let dragging = false, ox = 0, oy = 0
+	let dragging = false,
+		ox = 0,
+		oy = 0
 	handle.addEventListener('mousedown', (e: MouseEvent) => {
 		if (e.button !== 0) return
 		dragging = true
 		const r = el.getBoundingClientRect()
-		ox = e.clientX - r.left; oy = e.clientY - r.top
-		el.style.top = `${r.top}px`; el.style.right = 'auto'; el.style.left = `${r.left}px`
+		ox = e.clientX - r.left
+		oy = e.clientY - r.top
+		el.style.top = `${r.top}px`
+		el.style.right = 'auto'
+		el.style.left = `${r.left}px`
 		handle.style.cursor = 'grabbing'
 		e.preventDefault()
 	})
 	document.addEventListener('mousemove', (e: MouseEvent) => {
 		if (!dragging) return
 		el.style.left = `${Math.max(0, Math.min(window.innerWidth - el.offsetWidth, e.clientX - ox))}px`
-		el.style.top  = `${Math.max(0, Math.min(window.innerHeight - el.offsetHeight, e.clientY - oy))}px`
+		el.style.top = `${Math.max(0, Math.min(window.innerHeight - el.offsetHeight, e.clientY - oy))}px`
 	})
-	document.addEventListener('mouseup', () => { dragging = false; handle.style.cursor = 'grab' })
+	document.addEventListener('mouseup', () => {
+		dragging = false
+		handle.style.cursor = 'grab'
+	})
 }
 
 export function closePopup() {
-	popup?.remove(); popup = null
+	popup?.remove()
+	popup = null
 }
 
 export function setupSettingsTrigger(videoElement: HTMLVideoElement, saveCallback: () => void) {
@@ -127,6 +166,10 @@ export function setupSettingsTrigger(videoElement: HTMLVideoElement, saveCallbac
 		if (!e.shiftKey) return
 		e.preventDefault()
 		if (popup) closePopup()
-		else { onSave = saveCallback; popup = buildPopup(); document.body.appendChild(popup) }
+		else {
+			onSave = saveCallback
+			popup = buildPopup()
+			document.body.appendChild(popup)
+		}
 	})
 }
