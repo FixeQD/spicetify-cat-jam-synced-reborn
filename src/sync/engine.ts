@@ -1,5 +1,5 @@
-import { APP_CONFIG } from './config'
-import { cachedSettings } from './settings'
+import { APP_CONFIG } from '../config'
+import { cachedSettings } from '../settings/settings'
 
 export interface SyncState {
 	playbackRate: number

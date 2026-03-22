@@ -1,8 +1,8 @@
-import { APP_CONFIG } from './config'
-import { cachedSettings } from './settings'
-import { getAudioData, fetchAudioData } from './audio'
-import { syncEngine } from './sync-engine'
-import type { PerformanceLevel } from './performance'
+import { APP_CONFIG } from '../config'
+import { cachedSettings } from '../settings/settings'
+import { getAudioData, fetchAudioData } from '../audio/audio'
+import { syncEngine } from '../sync/engine'
+import type { PerformanceLevel } from '../performance'
 
 let videoElement: HTMLVideoElement | null = null
 let lastSyncBeatIndex = -1

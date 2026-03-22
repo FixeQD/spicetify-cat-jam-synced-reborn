@@ -1,4 +1,4 @@
-import { APP_CONFIG } from './config'
+import { APP_CONFIG } from '../config'
 
 export const SETTINGS_SCHEMA = {
 	link: { id: 'catjam-webm-link', label: 'Custom webM video URL', type: 'input', default: '' },

@@ -1,4 +1,4 @@
-import { APP_CONFIG } from './config'
+import { APP_CONFIG } from '../config'
 import { getLocalBPM, getLoudnessAt, normalizeLoudness } from './analyzer'
 
 let audioData: any = null

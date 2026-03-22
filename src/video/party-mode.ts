@@ -1,6 +1,6 @@
-import { getAudioData } from './audio'
-import { getLoudnessAt, normalizeLoudness, getInstantBPM } from './analyzer'
-import { cachedSettings } from './settings'
+import { getAudioData } from '../audio/audio'
+import { getLoudnessAt, normalizeLoudness, getInstantBPM } from '../audio/analyzer'
+import { cachedSettings } from '../settings/settings'
 
 // fallback constants — actual values come from cachedSettings at runtime
 export const PARTY_BPM_THRESHOLD = 130
