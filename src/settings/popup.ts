@@ -1,6 +1,7 @@
 import { SETTINGS_SCHEMA } from './settings'
 import { toggleDebugOverlay, isDebugVisible } from '../debug/overlay'
 import { inputControl, numberControl, dropdownControl, settingsRow, settingsSection, actionBtn } from './popup-ui'
+import { openDropsEditor } from './drops-editor'
 
 declare const __APP_VERSION__: string
 
@@ -69,6 +70,9 @@ function buildPopup(): HTMLDivElement {
 	)
 	body.appendChild(settingsRow('Left Size', numberControl(s.size.id, s.size.default, '%')))
 
+	const dropsBtn = actionBtn('🥁 Edit Drop Timestamps', () => openDropsEditor(), true)
+	dropsBtn.style.cssText += 'width: 100%; margin-top: 6px; text-align: center;'
+	body.appendChild(dropsBtn)
 	body.appendChild(settingsSection('🐱', 'Cat'))
 	body.appendChild(settingsRow('Size', numberControl(s.catSize.id, s.catSize.default, 'px')))
 	body.appendChild(
