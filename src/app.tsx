@@ -18,8 +18,16 @@ async function main() {
 
 	await createWebMVideo()
 
-	const videoEl = getVideoElement()
-	if (videoEl) setupSettingsTrigger(videoEl, () => createWebMVideo())
+	const initSettings = () => {
+		const videoEl = getVideoElement()
+		if (videoEl) {
+			setupSettingsTrigger(videoEl, async () => {
+				await createWebMVideo()
+				initSettings()
+			})
+		}
+	}
+	initSettings()
 
 	let animationId: number | null = null
 	const workerRef = { worker: createSyncWorker(), ready: false }
