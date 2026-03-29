@@ -21,6 +21,20 @@ function addFocusStyle(el: HTMLElement) {
 	el.addEventListener('blur',  () => ((el as any).style.borderColor = 'rgba(255,255,255,0.08)'))
 }
 
+export function inputControl(id: string, def: string): HTMLElement {
+	const wrap = document.createElement('div')
+	wrap.style.cssText = 'display: flex; align-items: center; gap: 5px;'
+	const el = document.createElement('input')
+	el.type = 'text'
+	el.value = getSaved(id, def)
+	el.placeholder = 'default'
+	el.style.cssText = baseInput + 'width: 120px;'
+	addFocusStyle(el)
+	el.addEventListener('change', () => setSaved(id, el.value))
+	wrap.appendChild(el)
+	return wrap
+}
+
 export function numberControl(id: string, def: number, unit?: string): HTMLElement {
 	const wrap = document.createElement('div')
 	wrap.style.cssText = 'display: flex; align-items: center; gap: 5px;'

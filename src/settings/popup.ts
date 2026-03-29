@@ -1,6 +1,6 @@
 import { SETTINGS_SCHEMA } from './settings'
 import { toggleDebugOverlay, isDebugVisible } from '../debug/overlay'
-import { numberControl, settingsRow, settingsSection, actionBtn } from './popup-ui'
+import { inputControl, numberControl, dropdownControl, settingsRow, settingsSection, actionBtn } from './popup-ui'
 
 declare const __APP_VERSION__: string
 
@@ -61,6 +61,13 @@ function buildPopup(): HTMLDivElement {
 	const body = document.createElement('div')
 	body.style.cssText = 'padding: 4px 12px 12px;'
 	const s = SETTINGS_SCHEMA
+
+	body.appendChild(settingsSection('🎬', 'Video'))
+	body.appendChild(settingsRow('Custom webM URL', inputControl(s.link.id, s.link.default)))
+	body.appendChild(
+		settingsRow('Position', dropdownControl(s.position.id, [...s.position.options]))
+	)
+	body.appendChild(settingsRow('Left Size', numberControl(s.size.id, s.size.default, '%')))
 
 	body.appendChild(settingsSection('🐱', 'Cat'))
 	body.appendChild(settingsRow('Size', numberControl(s.catSize.id, s.catSize.default, 'px')))
