@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+### v3.1.0 (Settings & Sync Update) 🐱⚙️
+
+- **Fixed missing settings**: Added all missing configuration options to the settings popup, including custom video URLs, and position controls.
+- **New Drop Timestamps Editor**: Added a dedicated editor to fine-tune exactly when the cat's head drops. This makes it easy to perfectly sync any custom video with the music.
+- **Restored Settings Shortcut**: Fixed a bug where the Shift + Click shortcut would stop working after you saved your settings. Now it works every time without needing a reload.
+
 ### v3.0.0 (Worker Refactor) 🔧
 
 - **Eliminated worker blob duplication**: Sync logic was previously copy-pasted as a raw string inside `worker-factory.ts`. Extracted into `src/sync/algorithm.ts` — pure functions (`computeNextRate`, `findNextBeat`, `getTimeUntilNextDrop`) shared by both the main thread engine and the worker.
