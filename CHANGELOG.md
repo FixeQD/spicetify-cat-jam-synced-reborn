@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+### v3.1.1 🐱✨
+
+- **Seamless Transitions**: Removed the forced video reset to 0 on track changes and seeking. The cat now continues jamming smoothly, with the sync engine aligning its rhythm to the new track without visible jumps.
+
 ### v3.1.0 (Settings & Sync Update) 🐱⚙️
 
 - **Fixed missing settings**: Added all missing configuration options to the settings popup, including custom video URLs, and position controls.

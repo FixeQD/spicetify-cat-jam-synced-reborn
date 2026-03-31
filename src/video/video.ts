@@ -40,7 +40,6 @@ export function syncTiming(startTime: number, progress: number) {
 	if (Spicetify.Player.isPlaying()) {
 		syncEngine.reset()
 		lastSyncBeatIndex = -1
-		videoElement.currentTime = 0
 		videoElement.play()
 	} else {
 		videoElement.pause()
