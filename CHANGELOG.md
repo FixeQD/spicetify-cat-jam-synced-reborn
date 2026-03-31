@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+### v3.1.2 🚀
+
+- **Dependency updates**: Bumped all dependencies and devDependencies to their latest versions.
+- **Cleanup**: Removed unused `spcr-settings` dependency.
+
 ### v3.1.1 🐱✨
 
 - **Seamless Transitions**: Removed the forced video reset to 0 on track changes and seeking. The cat now continues jamming smoothly, with the sync engine aligning its rhythm to the new track without visible jumps.
