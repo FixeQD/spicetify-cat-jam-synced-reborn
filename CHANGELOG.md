@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+### v3.1.3 🧹🐱
+
+- **Repo Cleanup**: Moved the build artifact to a separate `build` branch to avoid cluttering the main repository history.
+
 ### v3.1.2 🚀
 
 - **Dependency updates**: Bumped all dependencies and devDependencies to their latest versions.
