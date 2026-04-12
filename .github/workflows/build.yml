@@ -58,6 +58,7 @@ jobs:
 
                   VERSION=$(jq -r .version package.json)
                   cp dist/cat-jam.js ../cat-jam.js
+                  cp assets/preview.gif ../preview.gif
 
                   git fetch origin build:build || true
                   git checkout build || git checkout --orphan build
@@ -66,7 +67,7 @@ jobs:
                   git clean -fdx
 
                   mv ../cat-jam.js ./cat-jam.js
-                  mv assets/preview.gif ./preview.gif
+                  mv ../preview.gif ./preview.gif
                   git add cat-jam.js preview.gif
 
                   if git diff --staged --quiet >/dev/null 2>&1; then
