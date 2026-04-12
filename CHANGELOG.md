@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ### v3.1.4 🖼️✨
 
-- **Marketplace Preview**: Restored `preview.gif` to the `build` branch so the extension icon displays correctly in the Spicetify Marketplace.
+- **Marketplace Details**: Restored `preview.gif` and `README.md` to the `build` branch so the extension icon and description display correctly in the Spicetify Marketplace.
 
 ### v3.1.3 🧹🐱
 

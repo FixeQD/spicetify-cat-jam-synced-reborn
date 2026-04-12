@@ -59,6 +59,7 @@ jobs:
                   VERSION=$(jq -r .version package.json)
                   cp dist/cat-jam.js ../cat-jam.js
                   cp assets/preview.gif ../preview.gif
+                  cp README.md ../README.md
 
                   git fetch origin build:build || true
                   git checkout build || git checkout --orphan build
@@ -68,7 +69,8 @@ jobs:
 
                   mv ../cat-jam.js ./cat-jam.js
                   mv ../preview.gif ./preview.gif
-                  git add cat-jam.js preview.gif
+                  mv ../README.md ./README.md
+                  git add cat-jam.js preview.gif README.md
 
                   if git diff --staged --quiet >/dev/null 2>&1; then
                     echo "No changes in cat-jam.js to commit."
