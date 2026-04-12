@@ -66,7 +66,8 @@ jobs:
                   git clean -fdx
 
                   mv ../cat-jam.js ./cat-jam.js
-                  git add cat-jam.js
+                  mv assets/preview.gif ./preview.gif
+                  git add cat-jam.js preview.gif
 
                   if git diff --staged --quiet >/dev/null 2>&1; then
                     echo "No changes in cat-jam.js to commit."

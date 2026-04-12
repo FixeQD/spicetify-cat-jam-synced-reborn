@@ -2,7 +2,7 @@
 	{
 		"name": "Cat-Jam Synced (Reborn)",
 		"description": "A reborn and optimized Cat-Jam experience, perfectly in sync with your beat.",
-		"preview": "assets/preview.gif",
+		"preview": "preview.gif",
 		"main": "cat-jam.js",
 		"branch": "build",
 		"readme": "README.md",
