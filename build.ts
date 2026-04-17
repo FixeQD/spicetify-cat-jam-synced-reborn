@@ -1,4 +1,3 @@
-import { minify } from 'terser'
 import { writeFile, readFile, copyFile, mkdir, watch } from 'fs/promises'
 import { join, resolve } from 'path'
 import { homedir } from 'os'
@@ -24,7 +23,6 @@ const workerBundlePlugin = {
 }
 
 async function bundleWorkerFile(entryPoint: string): Promise<string> {
-	// Use spawnSync to avoid recursive Bun.build issues that might cause hangs
 	const proc = Bun.spawnSync(['bun', 'build', entryPoint, '--target', 'browser', '--minify'])
 	if (!proc.success) {
 		console.error(`Worker build failed for ${entryPoint}:`, proc.stderr.toString())
@@ -71,41 +69,13 @@ const spicetifyPlugin = {
 	},
 }
 
-const runTerser = async () => {
-	const start = performance.now()
-	console.log('Minifying with Terser...')
-	try {
-		const code = await readFile(outFile, 'utf-8')
-		const minified = await minify(code, {
-			compress: {
-				passes: 3,
-				drop_console: false,
-			},
-			mangle: {
-				toplevel: true,
-			},
-			format: {
-				comments: false,
-				beautify: false,
-			},
-		})
-		if (minified.code) {
-			await writeFile(outFile, minified.code)
-			const end = performance.now()
-			console.log(`Terser optimization complete in ${(end - start).toFixed(2)}ms.`)
-		}
-	} catch (err) {
-		console.error('Terser error:', err)
-	}
-}
-
 const buildProject = async () => {
 	const start = performance.now()
 	console.log('[bun] Running main build...')
 	const result = await Bun.build({
 		entrypoints: [entryPoint],
 		target: 'browser',
-		minify: false,
+		minify: true,
 		define: {
 			'process.env.NODE_ENV': isWatch ? '"development"' : '"production"',
 			'__APP_VERSION__': JSON.stringify(pkg.version),
@@ -182,7 +152,6 @@ const runBuild = async () => {
 			}
 		} else {
 			if (await buildProject()) {
-				await runTerser()
 				const totalEnd = performance.now()
 				console.log(`Build finished successfully in ${(totalEnd - totalStart).toFixed(2)}ms.`)
 			} else {
