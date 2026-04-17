@@ -1,6 +1,6 @@
 import { SETTINGS_SCHEMA } from './settings'
 import { toggleDebugOverlay, isDebugVisible } from '../debug/overlay'
-import { inputControl, numberControl, dropdownControl, settingsRow, settingsSection, actionBtn } from './popup-ui'
+import { inputControl, fileInputControl, numberControl, dropdownControl, settingsRow, settingsSection, actionBtn } from './popup-ui'
 import { openDropsEditor } from './drops-editor'
 
 declare const __APP_VERSION__: string
@@ -64,7 +64,7 @@ function buildPopup(): HTMLDivElement {
 	const s = SETTINGS_SCHEMA
 
 	body.appendChild(settingsSection('🎬', 'Video'))
-	body.appendChild(settingsRow('Custom webM URL', inputControl(s.link.id, s.link.default)))
+	body.appendChild(settingsRow('Custom webM URL', fileInputControl(s.link.id, s.link.default)))
 	body.appendChild(
 		settingsRow('Position', dropdownControl(s.position.id, [...s.position.options]))
 	)
