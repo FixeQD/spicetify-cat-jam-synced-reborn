@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+### v3.2.0 (Local Import Update) 📁🐱
+
+- **Local File Import**: Added a new "📁" button next to the URL setting. You can now select a `.webm` file directly from your computer - no external hosting required!
+
 ### v3.1.4 🖼️✨
 
 - **Marketplace Details**: Restored `preview.gif` and `README.md` to the `build` branch so the extension icon and description display correctly in the Spicetify Marketplace.
