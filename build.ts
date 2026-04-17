@@ -1,19 +1,19 @@
-import { build, type BuildOptions, type Plugin } from 'esbuild'
 import { minify } from 'terser'
-import { writeFile, readFile, copyFile, mkdir } from 'fs/promises'
+import { writeFile, readFile, copyFile, mkdir, watch } from 'fs/promises'
 import { join, resolve } from 'path'
 import { homedir } from 'os'
 import { execSync, spawn } from 'child_process'
 
-const workerBundlePlugin: Plugin = {
+const workerBundlePlugin = {
 	name: 'worker-bundle',
-	setup(build) {
-		build.onResolve({ filter: /\?worker$/ }, (args) => ({
+	setup(build: any) {
+		build.onResolve({ filter: /\?worker$/ }, (args: any) => ({
 			path: resolve(args.resolveDir, args.path.replace(/\?worker$/, '')),
 			namespace: 'worker-bundle',
 		}))
 
-		build.onLoad({ filter: /.*/, namespace: 'worker-bundle' }, async (args) => {
+		build.onLoad({ filter: /.*/, namespace: 'worker-bundle' }, async (args: any) => {
+			console.log(`[bun] Bundling worker: ${args.path}`)
 			const result = await bundleWorkerFile(args.path)
 			return {
 				contents: `export default ${JSON.stringify(result)};`,
@@ -24,18 +24,13 @@ const workerBundlePlugin: Plugin = {
 }
 
 async function bundleWorkerFile(entryPoint: string): Promise<string> {
-	const result = await build({
-		entryPoints: [entryPoint],
-		bundle: true,
-		write: false,
-		format: 'iife',
-		platform: 'browser',
-		target: 'es2017',
-		define: {
-			'process.env.NODE_ENV': '"production"',
-		},
-	})
-	return result.outputFiles[0].text
+	// Use spawnSync to avoid recursive Bun.build issues that might cause hangs
+	const proc = Bun.spawnSync(['bun', 'build', entryPoint, '--target', 'browser', '--minify'])
+	if (!proc.success) {
+		console.error(`Worker build failed for ${entryPoint}:`, proc.stderr.toString())
+		throw new Error('Worker build failed')
+	}
+	return proc.stdout.toString()
 }
 
 const pkg = JSON.parse(await readFile(join(process.cwd(), 'package.json'), 'utf-8'))
@@ -50,7 +45,6 @@ function getSpicetifyExtensionsDir(): string {
 		const raw = execSync('spicetify path userdata', { encoding: 'utf-8' }).trim()
 		return join(raw, 'Extensions')
 	} catch {
-		// fallback for common paths
 		const platform = process.platform
 		if (platform === 'win32') {
 			return join(process.env.APPDATA ?? homedir(), 'spicetify', 'Extensions')
@@ -64,35 +58,17 @@ function getSpicetifyExtensionsDir(): string {
 
 const isWatch = process.argv.includes('--watch')
 
-// Plugin to use Spicetify's built-in React and ReactDOM
-const spicetifyPlugin: Plugin = {
+const spicetifyPlugin = {
 	name: 'spicetify-plugin',
-	setup(build) {
-		build.onResolve({ filter: /^(react|react-dom)$/ }, (args) => {
+	setup(build: any) {
+		build.onResolve({ filter: /^(react|react-dom)$/ }, (args: any) => {
 			return { path: args.path, namespace: 'spicetify-external' }
 		})
-		build.onLoad({ filter: /.*/, namespace: 'spicetify-external' }, (args) => {
+		build.onLoad({ filter: /.*/, namespace: 'spicetify-external' }, (args: any) => {
 			const g = args.path === 'react' ? 'Spicetify.React' : 'Spicetify.ReactDOM'
 			return { contents: `module.exports = ${g};`, loader: 'js' }
 		})
 	},
-}
-
-const esbuildConfig: BuildOptions = {
-	entryPoints: [entryPoint],
-	bundle: true,
-	outfile: outFile,
-	format: 'iife',
-	globalName: 'CatJam',
-	platform: 'browser',
-	target: 'es2017',
-	minify: false,
-	sourcemap: isWatch ? 'inline' : false,
-	define: {
-		'process.env.NODE_ENV': isWatch ? '"development"' : '"production"',
-		'__APP_VERSION__': JSON.stringify(pkg.version),
-	},
-	plugins: [spicetifyPlugin, workerBundlePlugin],
 }
 
 const runTerser = async () => {
@@ -102,7 +78,7 @@ const runTerser = async () => {
 		const minified = await minify(code, {
 			compress: {
 				passes: 3,
-				drop_console: false, // Keep logs for debugging
+				drop_console: false,
 			},
 			mangle: {
 				toplevel: true,
@@ -121,44 +97,63 @@ const runTerser = async () => {
 	}
 }
 
+const buildProject = async () => {
+	console.log('[bun] Running main build...')
+	const result = await Bun.build({
+		entrypoints: [entryPoint],
+		target: 'browser',
+		minify: false,
+		define: {
+			'process.env.NODE_ENV': isWatch ? '"development"' : '"production"',
+			'__APP_VERSION__': JSON.stringify(pkg.version),
+		},
+		plugins: [spicetifyPlugin, workerBundlePlugin],
+	})
+
+	if (!result.success) {
+		console.error('Build failed:', result.logs)
+		return false
+	}
+
+	console.log('[bun] Post-processing bundle...')
+	let code = await result.outputs[0].text()
+
+	// Clean up ESM exports and wrap in IIFE for Spicetify compatibility
+	code = code.replace(/export\s+\{[^}]+\};/g, '')
+	code = code.replace(/export\s+default\s+[^;]+;/g, '')
+
+	const iifeCode = `(function() {
+${code}
+})();`
+
+	await writeFile(outFile, iifeCode)
+	return true
+}
+
 const runBuild = async () => {
-	console.log(isWatch ? '[esbuild] Starting watch mode...' : 'Building project...')
+	console.log(isWatch ? '[bun] Starting watch mode...' : 'Building project...')
 
 	try {
+		await mkdir(outDir, { recursive: true })
+
 		if (isWatch) {
 			const extDir = getSpicetifyExtensionsDir()
 			await mkdir(extDir, { recursive: true })
 			const extDest = join(extDir, extFileName)
 
-			const esbuild = await import('esbuild')
-			const ctx = await esbuild.context({
-				...esbuildConfig,
-				plugins: [
-					...esbuildConfig.plugins!,
-					{
-						name: 'copy-to-extensions',
-						setup(build) {
-							build.onEnd(async (result) => {
-								if (result.errors.length > 0) {
-									console.error(`[esbuild] Build failed:`, result.errors)
-									return
-								}
-								console.log(
-									`[esbuild] Build successful at ${new Date().toLocaleTimeString()}`
-								)
-								try {
-									await copyFile(outFile, extDest)
-									console.log(`[spicetify] Copied → ${extDest}`)
-								} catch (err) {
-									console.error('[spicetify] Copy failed:', err)
-								}
-							})
-						},
-					},
-				],
-			})
-			await ctx.watch()
-			console.log('[esbuild] Watching for changes...')
+			const performBuild = async () => {
+				if (await buildProject()) {
+					console.log(`[bun] Build successful at ${new Date().toLocaleTimeString()}`)
+					try {
+						await copyFile(outFile, extDest)
+						console.log(`[spicetify] Copied → ${extDest}`)
+					} catch (err) {
+						console.error('[spicetify] Copy failed:', err)
+					}
+				}
+			}
+
+			await performBuild()
 
 			const spicetify = spawn('spicetify', ['watch', '-e'], { stdio: 'inherit', shell: true })
 			console.log('[spicetify] watch -e started')
@@ -171,13 +166,21 @@ const runBuild = async () => {
 				spicetify.kill()
 				process.exit(0)
 			})
+
+			const watcher = watch(join(process.cwd(), 'src'), { recursive: true })
+			for await (const event of watcher) {
+				if (event.filename?.endsWith('.ts') || event.filename?.endsWith('.tsx')) {
+					console.log(`[bun] File changed: ${event.filename}, rebuilding...`)
+					await performBuild()
+				}
+			}
 		} else {
-			const result = await build(esbuildConfig)
-			if (result.errors.length > 0) {
+			if (await buildProject()) {
+				await runTerser()
+				console.log('Build finished successfully.')
+			} else {
 				process.exit(1)
 			}
-			await runTerser()
-			console.log('Build finished successfully.')
 		}
 	} catch (err) {
 		console.error('Critical build error:', err)
