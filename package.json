@@ -1,7 +1,8 @@
 {
 	"name": "cat-jam-reborn",
-	"version": "3.2.0",
+	"version": "3.3.0",
 	"private": true,
+	"description": "Synced Cat Jam extension for Spicetify, now with lightning-fast Bun build system!",
 	"scripts": {
 		"build": "bun build.ts",
 		"watch": "bun build.ts --watch",

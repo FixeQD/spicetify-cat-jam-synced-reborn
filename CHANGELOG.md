@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+### v3.3.0 (Bun Speedrun Update) ⚡🐱
+
+- **Migrated to Bun Build**: Switched from `esbuild` to Bun's native bundler. Build time dropped from ~2 seconds to... **15 milliseconds**. Yes, you read that right.
+- **Native Minification**: Ditched Terser in favor of Bun's built-in minifier. It's faster, lighter, and does the job perfectly.
+- **Build Timer**: The build script now proudly reports exactly how many milliseconds it took to prepare your code.
+- **Improved Watch Mode**: Refactored the development workflow to be more reliable and react instantly to every code change.
+
 ### v3.2.0 (Local Import Update) 📁🐱
 
 - **Local File Import**: Added a new "📁" button next to the URL setting. You can now select a `.webm` file directly from your computer - no external hosting required!
