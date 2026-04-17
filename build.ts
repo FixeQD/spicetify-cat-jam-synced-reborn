@@ -72,6 +72,7 @@ const spicetifyPlugin = {
 }
 
 const runTerser = async () => {
+	const start = performance.now()
 	console.log('Minifying with Terser...')
 	try {
 		const code = await readFile(outFile, 'utf-8')
@@ -90,7 +91,8 @@ const runTerser = async () => {
 		})
 		if (minified.code) {
 			await writeFile(outFile, minified.code)
-			console.log('Terser optimization complete.')
+			const end = performance.now()
+			console.log(`Terser optimization complete in ${(end - start).toFixed(2)}ms.`)
 		}
 	} catch (err) {
 		console.error('Terser error:', err)
@@ -98,6 +100,7 @@ const runTerser = async () => {
 }
 
 const buildProject = async () => {
+	const start = performance.now()
 	console.log('[bun] Running main build...')
 	const result = await Bun.build({
 		entrypoints: [entryPoint],
@@ -127,10 +130,13 @@ ${code}
 })();`
 
 	await writeFile(outFile, iifeCode)
+	const end = performance.now()
+	console.log(`[bun] Build successful in ${(end - start).toFixed(2)}ms.`)
 	return true
 }
 
 const runBuild = async () => {
+	const totalStart = performance.now()
 	console.log(isWatch ? '[bun] Starting watch mode...' : 'Building project...')
 
 	try {
@@ -143,7 +149,7 @@ const runBuild = async () => {
 
 			const performBuild = async () => {
 				if (await buildProject()) {
-					console.log(`[bun] Build successful at ${new Date().toLocaleTimeString()}`)
+					console.log(`[spicetify] Updated extensions at ${new Date().toLocaleTimeString()}`)
 					try {
 						await copyFile(outFile, extDest)
 						console.log(`[spicetify] Copied → ${extDest}`)
@@ -177,7 +183,8 @@ const runBuild = async () => {
 		} else {
 			if (await buildProject()) {
 				await runTerser()
-				console.log('Build finished successfully.')
+				const totalEnd = performance.now()
+				console.log(`Build finished successfully in ${(totalEnd - totalStart).toFixed(2)}ms.`)
 			} else {
 				process.exit(1)
 			}
