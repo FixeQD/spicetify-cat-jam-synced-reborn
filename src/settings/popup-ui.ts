@@ -35,6 +35,50 @@ export function inputControl(id: string, def: string): HTMLElement {
 	return wrap
 }
 
+export function fileInputControl(id: string, def: string): HTMLElement {
+	const wrap = document.createElement('div')
+	wrap.style.cssText = 'display: flex; align-items: center; gap: 5px;'
+
+	const el = document.createElement('input')
+	el.type = 'text'
+	el.value = getSaved(id, def)
+	el.placeholder = 'default'
+	el.style.cssText = baseInput + 'width: 100px;'
+	addFocusStyle(el)
+	el.addEventListener('change', () => setSaved(id, el.value))
+
+	const fileInput = document.createElement('input')
+	fileInput.type = 'file'
+	fileInput.accept = 'video/webm'
+	fileInput.style.display = 'none'
+
+	const btn = document.createElement('button')
+	btn.textContent = '📁'
+	btn.title = 'Import local webM'
+	btn.style.cssText = baseInput + 'cursor: pointer; padding: 3px 5px; font-size: 10px;'
+	btn.addEventListener('click', () => fileInput.click())
+
+	fileInput.addEventListener('change', async () => {
+		const file = fileInput.files?.[0]
+		if (!file) return
+
+		if (file.size > 5 * 1024 * 1024) {
+			Spicetify.showNotification('File too large (> 5MB). Storage may fail.')
+		}
+
+		const reader = new FileReader()
+		reader.onload = (e) => {
+			const base64 = e.target?.result as string
+			el.value = base64
+			setSaved(id, base64)
+		}
+		reader.readAsDataURL(file)
+	})
+
+	wrap.append(el, fileInput, btn)
+	return wrap
+}
+
 export function numberControl(id: string, def: number, unit?: string): HTMLElement {
 	const wrap = document.createElement('div')
 	wrap.style.cssText = 'display: flex; align-items: center; gap: 5px;'
