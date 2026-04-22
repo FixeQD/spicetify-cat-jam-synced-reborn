@@ -2,12 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+### v3.3.1 (Worker Inlining Fix) 🐛🔧
+
+- **Fixed Unexpected `export` SyntaxError**: Resolved a build-time issue where a leftover top-level `export` could remain in the final bundle (producing "Uncaught SyntaxError: Unexpected token 'export'"). The post-processing step now reliably strips inlined exports and string-literal exports produced when bundling workers.
+- **Improved Worker Inlining Robustness**: Updated build cleanup logic to handle multi-line export blocks and string/backtick literals used when inlining worker code. This prevents the worker-inlining pattern from leaking ESM syntax into the final IIFE.
+- **No functional changes**: This is a build-system fix only — runtime behavior of the extension remains unchanged. The extension will now load without the error.
+
 ### v3.3.0 (Bun Speedrun Update) ⚡🐱
 
 - **Migrated to Bun Build**: Switched from `esbuild` to Bun's native bundler. Build time dropped from ~2 seconds to... **15 milliseconds**. Yes, you read that right.
 - **Native Minification**: Ditched Terser in favor of Bun's built-in minifier. It's faster, lighter, and does the job perfectly.
 - **Build Timer**: The build script now proudly reports exactly how many milliseconds it took to prepare your code.
 - **Improved Watch Mode**: Refactored the development workflow to be more reliable and react instantly to every code change.
+
 
 ### v3.2.0 (Local Import Update) 📁🐱
 

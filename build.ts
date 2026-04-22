@@ -92,8 +92,10 @@ const buildProject = async () => {
 	let code = await result.outputs[0].text()
 
 	// Clean up ESM exports and wrap in IIFE for Spicetify compatibility
-	code = code.replace(/export\s+\{[^}]+\};/g, '')
-	code = code.replace(/export\s+default\s+[^;]+;/g, '')
+	code = code.replace(/export\s*\{[\s\S]*?\};/g, '')
+	// Remove `export default` where the default may be a string literal (single/double/backtick)
+	// or other expression; handle common worker-inlining pattern safely.
+	code = code.replace(/export\s+default\s+(?:'[^']*'|"[^"]*"|`(?:\\[\s\S]|[^`])*`)[\s;]*/g, '')
 
 	const iifeCode = `(function() {
 ${code}
@@ -119,7 +121,9 @@ const runBuild = async () => {
 
 			const performBuild = async () => {
 				if (await buildProject()) {
-					console.log(`[spicetify] Updated extensions at ${new Date().toLocaleTimeString()}`)
+					console.log(
+						`[spicetify] Updated extensions at ${new Date().toLocaleTimeString()}`
+					)
 					try {
 						await copyFile(outFile, extDest)
 						console.log(`[spicetify] Copied → ${extDest}`)
@@ -153,7 +157,9 @@ const runBuild = async () => {
 		} else {
 			if (await buildProject()) {
 				const totalEnd = performance.now()
-				console.log(`Build finished successfully in ${(totalEnd - totalStart).toFixed(2)}ms.`)
+				console.log(
+					`Build finished successfully in ${(totalEnd - totalStart).toFixed(2)}ms.`
+				)
 			} else {
 				process.exit(1)
 			}
