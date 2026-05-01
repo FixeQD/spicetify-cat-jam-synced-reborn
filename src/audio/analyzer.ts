@@ -49,9 +49,34 @@ export function getLocalBPM(beats: any[], timeSec: number, windowSeconds: number
 	if (!beats || beats.length < 2) return 0
 
 	const windowStart = timeSec - windowSeconds
-	const localBeats = beats.filter((b) => b.start >= windowStart && b.start <= timeSec)
+	
+	let startIdx = 0
+	let low = 0
+	let high = beats.length - 1
+	while (low <= high) {
+		const mid = (low + high) >> 1
+		if (beats[mid].start >= windowStart) {
+			startIdx = mid
+			high = mid - 1
+		} else {
+			low = mid + 1
+		}
+	}
 
-	if (localBeats.length < 2) {
+	let endIdx = beats.length - 1
+	low = startIdx
+	high = beats.length - 1
+	while (low <= high) {
+		const mid = (low + high) >> 1
+		if (beats[mid].start <= timeSec) {
+			endIdx = mid
+			low = mid + 1
+		} else {
+			high = mid - 1
+		}
+	}
+
+	if (startIdx >= endIdx) {
 		const nearby = beats.slice(0, Math.min(8, beats.length))
 		if (nearby.length < 2) return 0
 		const totalInterval = nearby[nearby.length - 1].start - nearby[0].start
@@ -59,12 +84,12 @@ export function getLocalBPM(beats: any[], timeSec: number, windowSeconds: number
 	}
 
 	const intervals: { bpm: number; weight: number }[] = []
-	for (let i = 1; i < localBeats.length; i++) {
-		const interval = localBeats[i].start - localBeats[i - 1].start
+	for (let i = startIdx + 1; i <= endIdx; i++) {
+		const interval = beats[i].start - beats[i - 1].start
 		if (interval <= 0) continue
 		const bpm = 60 / interval
 		if (bpm < 50 || bpm > 300) continue
-		const weight = (localBeats[i].confidence ?? 1) + (localBeats[i - 1].confidence ?? 1)
+		const weight = (beats[i].confidence ?? 1) + (beats[i - 1].confidence ?? 1)
 		intervals.push({ bpm, weight })
 	}
 

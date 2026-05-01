@@ -21,6 +21,9 @@ export function resetBeatAccuracy() {
 // ─── DOM ─────────────────────────────────────────────────────────────────────
 
 function createOverlayElement(): HTMLDivElement {
+	const existing = document.getElementById('catjam-debug-overlay')
+	if (existing) existing.remove()
+
 	const el = document.createElement('div')
 	el.id = 'catjam-debug-overlay'
 	el.style.cssText = `
@@ -106,7 +109,10 @@ function setupDrag(el: HTMLDivElement) {
 // ─── RAF loop ────────────────────────────────────────────────────────────────
 
 function tick() {
-	if (!visible || !overlay) return
+	if (!visible || !overlay || !document.body.contains(overlay)) {
+		visible = false
+		return
+	}
 	const content = overlay.querySelector('#catjam-debug-content') as HTMLElement
 	if (content) renderDebugContent(content, lastMetrics)
 	animFrameId = requestAnimationFrame(tick)
