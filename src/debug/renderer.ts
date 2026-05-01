@@ -20,35 +20,6 @@ export function resetBeatAccuracy() {
 	lastMeasuredBeatIndex = -1
 }
 
-// ─── formatters ──────────────────────────────────────────────────────────────
-
-function row(label: string, value: string, color?: string): string {
-	const valStyle = color ? `color: ${color}; font-weight: 600;` : 'color: #fff;'
-	return `
-		<div style="display: flex; justify-content: space-between; padding: 1px 0;">
-			<span style="color: rgba(255,255,255,0.5);">${label}</span>
-			<span style="${valStyle}">${value}</span>
-		</div>
-	`
-}
-
-function separator(title?: string): string {
-	if (title) {
-		return `
-			<div style="
-				margin: 6px 0 4px;
-				padding: 3px 0;
-				border-top: 1px solid rgba(255,255,255,0.06);
-				font-size: 9px;
-				color: rgba(255,255,255,0.3);
-				letter-spacing: 1px;
-				text-transform: uppercase;
-			">${title}</div>
-		`
-	}
-	return '<div style="margin: 4px 0; border-top: 1px solid rgba(255,255,255,0.06);"></div>'
-}
-
 function perfLevelColor(level: string): string {
 	if (level === 'high') return '#4ade80'
 	if (level === 'medium') return '#facc15'
@@ -75,9 +46,75 @@ function measureDrift(videoTime: number): number {
 	return minDist
 }
 
+// ─── dom updates ─────────────────────────────────────────────────────────────
+
+const domNodes = new Map<string, { valueEl: HTMLElement; lastValue?: string; lastColor?: string }>()
+
+function renderSeparator(container: HTMLElement, id: string, title?: string) {
+	if (domNodes.has(id)) return
+
+	const el = document.createElement('div')
+	if (title) {
+		el.style.cssText = `
+			margin: 6px 0 4px;
+			padding: 3px 0;
+			border-top: 1px solid rgba(255,255,255,0.06);
+			font-size: 9px;
+			color: rgba(255,255,255,0.3);
+			letter-spacing: 1px;
+			text-transform: uppercase;
+		`
+		el.textContent = title
+	} else {
+		el.style.cssText = 'margin: 4px 0; border-top: 1px solid rgba(255,255,255,0.06);'
+	}
+
+	container.appendChild(el)
+	domNodes.set(id, { valueEl: el }) // store to mark as created
+}
+
+function renderRow(
+	container: HTMLElement,
+	id: string,
+	label: string,
+	value: string,
+	color?: string
+) {
+	let node = domNodes.get(id)
+
+	if (!node) {
+		const el = document.createElement('div')
+		el.style.cssText = 'display: flex; justify-content: space-between; padding: 1px 0;'
+
+		const labelEl = document.createElement('span')
+		labelEl.style.color = 'rgba(255,255,255,0.5)'
+		labelEl.textContent = label
+
+		const valueEl = document.createElement('span')
+		el.appendChild(labelEl)
+		el.appendChild(valueEl)
+		container.appendChild(el)
+
+		node = { valueEl }
+		domNodes.set(id, node)
+	}
+
+	if (node.lastValue !== value) {
+		node.valueEl.textContent = value
+		node.lastValue = value
+	}
+
+	const targetColor = color || '#fff'
+	if (node.lastColor !== targetColor) {
+		node.valueEl.style.color = targetColor
+		node.valueEl.style.fontWeight = color ? '600' : 'normal'
+		node.lastColor = targetColor
+	}
+}
+
 // ─── main render ─────────────────────────────────────────────────────────────
 
-export function renderDebugContent(lastMetrics: DebugMetrics): string {
+export function renderDebugContent(container: HTMLElement, lastMetrics: DebugMetrics) {
 	const { progressMs, perfLevel, workerActive } = lastMetrics
 	const progressSec = progressMs / 1000
 	const audioData = getAudioData()
@@ -89,10 +126,16 @@ export function renderDebugContent(lastMetrics: DebugMetrics): string {
 
 	let beatIndex = -1
 	if (audioData?.beats?.length) {
-		for (let i = audioData.beats.length - 1; i >= 0; i--) {
-			if (audioData.beats[i].start <= progressSec) {
-				beatIndex = i
-				break
+		let low = 0
+		let high = audioData.beats.length - 1
+
+		while (low <= high) {
+			const mid = Math.floor((low + high) / 2)
+			if (audioData.beats[mid].start <= progressSec) {
+				beatIndex = mid
+				low = mid + 1
+			} else {
+				high = mid - 1
 			}
 		}
 	}
@@ -109,107 +152,80 @@ export function renderDebugContent(lastMetrics: DebugMetrics): string {
 		if (driftHistory.length > totalBeats) driftHistory.shift()
 	}
 
-	let html = separator('PERFORMANCE')
-	html += row('FPS', perf.fps.toFixed(1), perfLevelColor(perf.level))
-	html += row('Profile', perf.level.toUpperCase(), perfLevelColor(perf.level))
-	html += row('Frame Time', perf.avgFrameTime.toFixed(1) + 'ms')
-	html += row(
-		'Dropped Frames',
-		String(perf.droppedFrames),
-		perf.droppedFrames > 10 ? '#f87171' : undefined
-	)
-	html += row(
-		'Worker',
-		workerActive ? 'ACTIVE' : 'MAIN THREAD',
-		workerActive ? '#4ade80' : '#facc15'
-	)
+	renderSeparator(container, 'sep-perf', 'PERFORMANCE')
+	renderRow(container, 'perf-fps', 'FPS', perf.fps.toFixed(1), perfLevelColor(perf.level))
+	renderRow(container, 'perf-profile', 'Profile', perf.level.toUpperCase(), perfLevelColor(perf.level))
+	renderRow(container, 'perf-frametime', 'Frame Time', perf.avgFrameTime.toFixed(1) + 'ms')
+	renderRow(container, 'perf-dropped', 'Dropped Frames', String(perf.droppedFrames), perf.droppedFrames > 10 ? '#f87171' : undefined)
+	renderRow(container, 'perf-worker', 'Worker', workerActive ? 'ACTIVE' : 'MAIN THREAD', workerActive ? '#4ade80' : '#facc15')
 
-	html += separator('SYNC ENGINE')
-	html += row('Actual Rate', actualRate.toFixed(3) + 'x')
-	if (lastMetrics.targetRate !== undefined)
-		html += row('Target Rate', lastMetrics.targetRate.toFixed(3) + 'x', '#60a5fa')
-	html += row('Beat Index', String(beatIndex))
-	html += row('Beat Drift', `${liveDriftMs.toFixed(1)}ms`, driftColor(liveDriftMs))
+	renderSeparator(container, 'sep-sync', 'SYNC ENGINE')
+	renderRow(container, 'sync-actualrate', 'Actual Rate', actualRate.toFixed(3) + 'x')
+	if (lastMetrics.targetRate !== undefined) {
+		renderRow(container, 'sync-targetrate', 'Target Rate', lastMetrics.targetRate.toFixed(3) + 'x', '#60a5fa')
+	}
+	renderRow(container, 'sync-beatidx', 'Beat Index', String(beatIndex))
+	renderRow(container, 'sync-drift', 'Beat Drift', `${liveDriftMs.toFixed(1)}ms`, driftColor(liveDriftMs))
+	
 	if (driftHistory.length > 0) {
 		const accuracy =
 			(driftHistory.reduce((s, d) => s + Math.max(0, 1 - d / MAX_DRIFT_MS), 0) /
 				driftHistory.length) *
 			100
-		html += row(
-			'Beat Accuracy',
-			`${accuracy.toFixed(1)}% (last ${driftHistory.length})`,
-			accuracy >= 85
-				? '#4ade80'
-				: accuracy >= 35
-					? '#ffffff'
-					: accuracy >= 10
-						? '#facc15'
-						: '#f87171'
-		)
+		const accColor = accuracy >= 85 ? '#4ade80' : accuracy >= 35 ? '#ffffff' : accuracy >= 10 ? '#facc15' : '#f87171'
+		renderRow(container, 'sync-accuracy', 'Beat Accuracy', `${accuracy.toFixed(1)}% (last ${driftHistory.length})`, accColor)
+	} else {
+		renderRow(container, 'sync-accuracy', 'Beat Accuracy', '---')
 	}
 
-	html += separator('AUDIO ANALYSIS')
+	renderSeparator(container, 'sep-audio', 'AUDIO ANALYSIS')
 	if (audioData) {
 		const globalBPM = audioData.track?.tempo ?? 0
 		const localBPM = getLocalBPM(audioData.beats, progressSec) || globalBPM
-		html += row('Global BPM', globalBPM.toFixed(1))
-		html += row(
-			'Local BPM',
-			localBPM.toFixed(1),
-			localBPM !== globalBPM ? '#60a5fa' : undefined
-		)
+		renderRow(container, 'audio-globalbpm', 'Global BPM', globalBPM.toFixed(1))
+		renderRow(container, 'audio-localbpm', 'Local BPM', localBPM.toFixed(1), localBPM !== globalBPM ? '#60a5fa' : undefined)
+		
 		const loudnessDb = getLoudnessAt(audioData.segments, progressSec)
 		const scale = 1 + normalizeLoudness(loudnessDb) * (APP_CONFIG.VISUAL.MAX_SCALE - 1)
-		html += row('Loudness', loudnessDb.toFixed(1) + 'dB')
-		html += row('Scale', scale.toFixed(3) + 'x')
-		html += row('Segments', String(audioData.segments?.length ?? 0))
-		html += row('Beats', String(audioData.beats?.length ?? 0))
+		renderRow(container, 'audio-loudness', 'Loudness', loudnessDb.toFixed(1) + 'dB')
+		renderRow(container, 'audio-scale', 'Scale', scale.toFixed(3) + 'x')
+		renderRow(container, 'audio-segments', 'Segments', String(audioData.segments?.length ?? 0))
+		renderRow(container, 'audio-beats', 'Beats', String(audioData.beats?.length ?? 0))
 	} else {
-		html += row('Status', 'No audio data', '#f87171')
+		renderRow(container, 'audio-status', 'Status', 'No audio data', '#f87171')
 	}
 
-	html += separator('VIDEO')
+	renderSeparator(container, 'sep-video', 'VIDEO')
 	if (video) {
-		html += row('Video Time', video.currentTime.toFixed(3) + 's')
-		html += row('Paused', video.paused ? 'YES' : 'NO', video.paused ? '#f87171' : '#4ade80')
+		renderRow(container, 'video-time', 'Video Time', video.currentTime.toFixed(3) + 's')
+		renderRow(container, 'video-paused', 'Paused', video.paused ? 'YES' : 'NO', video.paused ? '#f87171' : '#4ade80')
 		const vt = video.currentTime % APP_CONFIG.VIDEO_DURATION
 		const nextDrop = APP_CONFIG.CAT_HEAD_DROPS.find((d) => d > vt)
 		const timeUntilDrop = nextDrop
 			? nextDrop - vt
 			: APP_CONFIG.VIDEO_DURATION - vt + APP_CONFIG.CAT_HEAD_DROPS[0]
-		html += row('Next Head Drop', `in ${(timeUntilDrop * 1000).toFixed(0)}ms`)
+		renderRow(container, 'video-head', 'Next Head Drop', `in ${(timeUntilDrop * 1000).toFixed(0)}ms`)
+	} else {
+		renderRow(container, 'video-status', 'Status', 'No video data', '#f87171')
 	}
 
-	html += separator('RATE BUFFER')
-	html += row('Buffer Size', String(buffer.getBufferSize()))
-	html += row('Stale', buffer.isStale() ? 'YES' : 'NO', buffer.isStale() ? '#f87171' : '#4ade80')
+	renderSeparator(container, 'sep-rate', 'RATE BUFFER')
+	renderRow(container, 'rate-size', 'Buffer Size', String(buffer.getBufferSize()))
+	renderRow(container, 'rate-stale', 'Stale', buffer.isStale() ? 'YES' : 'NO', buffer.isStale() ? '#f87171' : '#4ade80')
 
-	html += separator('PLAYBACK')
+	renderSeparator(container, 'sep-playback', 'PLAYBACK')
 	const totalMs = Spicetify?.Player?.getDuration?.() ?? 0
 	const pMin = Math.floor(progressMs / 60000)
 	const pSec = Math.floor((progressMs % 60000) / 1000)
 	const tMin = Math.floor(totalMs / 60000)
 	const tSec = Math.floor((totalMs % 60000) / 1000)
-	html += row(
-		'Progress',
-		`${pMin}:${String(pSec).padStart(2, '0')} / ${tMin}:${String(tSec).padStart(2, '0')}`
-	)
+	renderRow(container, 'play-progress', 'Progress', `${pMin}:${String(pSec).padStart(2, '0')} / ${tMin}:${String(tSec).padStart(2, '0')}`)
 
-	html += separator('PARTY MODE')
+	renderSeparator(container, 'sep-party', 'PARTY MODE')
 	const party = getPartyModeState()
-	html += row('Active', party.active ? 'YES' : 'NO', party.active ? '#e879f9' : '#4ade80')
-	html += row(
-		'BPM',
-		`${party.bpm.toFixed(1)} / ${PARTY_BPM_THRESHOLD}`,
-		party.bpm >= PARTY_BPM_THRESHOLD ? '#e879f9' : 'rgba(255,255,255,0.4)'
-	)
-	html += row(
-		'Loudness',
-		`${party.loudnessDb.toFixed(1)}dB / ${PARTY_LOUDNESS_THRESHOLD_DB}dB`,
-		party.loudnessDb >= PARTY_LOUDNESS_THRESHOLD_DB ? '#e879f9' : 'rgba(255,255,255,0.4)'
-	)
-	html += row('Opacity', party.opacity.toFixed(3), party.active ? '#e879f9' : undefined)
-	html += row('Flash', party.flash.toFixed(3))
-
-	return html
+	renderRow(container, 'party-active', 'Active', party.active ? 'YES' : 'NO', party.active ? '#e879f9' : '#4ade80')
+	renderRow(container, 'party-bpm', 'BPM', `${party.bpm.toFixed(1)} / ${PARTY_BPM_THRESHOLD}`, party.bpm >= PARTY_BPM_THRESHOLD ? '#e879f9' : 'rgba(255,255,255,0.4)')
+	renderRow(container, 'party-loudness', 'Loudness', `${party.loudnessDb.toFixed(1)}dB / ${PARTY_LOUDNESS_THRESHOLD_DB}dB`, party.loudnessDb >= PARTY_LOUDNESS_THRESHOLD_DB ? '#e879f9' : 'rgba(255,255,255,0.4)')
+	renderRow(container, 'party-opacity', 'Opacity', party.opacity.toFixed(3), party.active ? '#e879f9' : undefined)
+	renderRow(container, 'party-flash', 'Flash', party.flash.toFixed(3))
 }

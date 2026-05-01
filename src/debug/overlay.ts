@@ -108,7 +108,7 @@ function setupDrag(el: HTMLDivElement) {
 function tick() {
 	if (!visible || !overlay) return
 	const content = overlay.querySelector('#catjam-debug-content') as HTMLElement
-	if (content) content.innerHTML = renderDebugContent(lastMetrics)
+	if (content) renderDebugContent(content, lastMetrics)
 	animFrameId = requestAnimationFrame(tick)
 }
 
