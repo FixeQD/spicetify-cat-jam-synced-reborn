@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+### v3.4.0 (Performance & Debug Optimization) 🚀🐱
+
+- **Ultra-fast Debug Overlay**: Rewrote the debug panel to update elements directly instead of rebuilding the entire view every frame. This fixes the massive FPS drops when the overlay was open.
+- **Memory Leak Protection**: Added a cleanup system for hot-reloading. No more stacked overlays or hidden background loops slowing down your Spotify.
+- **Optimized Audio Analysis**: Refactored rhythm calculation (BPM) to use binary search, significantly reducing CPU usage and garbage collection spikes.
+
 ### v3.3.1 (Worker Inlining Fix) 🐛🔧
 
 - **Fixed Unexpected `export` SyntaxError**: Resolved a build-time issue where a leftover top-level `export` could remain in the final bundle (producing "Uncaught SyntaxError: Unexpected token 'export'"). The post-processing step now reliably strips inlined exports and string-literal exports produced when bundling workers.
