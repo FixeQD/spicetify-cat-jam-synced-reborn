@@ -7,9 +7,18 @@
 		"branch": "build",
 		"readme": "README.md",
 		"authors": [
-			{ "name": "BlafKing", "url": "https://github.com/BlafKing" },
-			{ "name": "FixeQ", "url": "https://github.com/FixeQD" }
+			{
+				"name": "FixeQ",
+				"url": "https://github.com/FixeQD"
+			}
 		],
-		"tags": ["spicetify", "cat-jam", "cat", "jam", "synced", "reborn"]
+		"tags": [
+			"spicetify",
+			"cat-jam",
+			"cat",
+			"jam",
+			"synced",
+			"reborn"
+		]
 	}
 ]
