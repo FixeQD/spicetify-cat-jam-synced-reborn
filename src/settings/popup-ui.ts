@@ -136,6 +136,20 @@ export function settingsSection(icon: string, title: string): HTMLDivElement {
 	return el
 }
 
+export function toggleControl(id: string, def: string): HTMLElement {
+	const wrap = document.createElement('div')
+	wrap.style.cssText = 'display: flex; align-items: center; gap: 5px;'
+
+	const el = document.createElement('input')
+	el.type = 'checkbox'
+	el.checked = getSaved(id, def) === '1'
+	el.style.cssText = 'cursor: pointer; accent-color: #818cf8;'
+
+	el.addEventListener('change', () => setSaved(id, el.checked ? '1' : '0'))
+	wrap.appendChild(el)
+	return wrap
+}
+
 export function actionBtn(label: string, onClick: () => void, accent = false): HTMLButtonElement {
 	const bg    = accent ? 'rgba(232,121,249,0.1)'  : 'rgba(255,255,255,0.05)'
 	const bgHov = accent ? 'rgba(232,121,249,0.2)'  : 'rgba(255,255,255,0.1)'

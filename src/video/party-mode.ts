@@ -33,6 +33,7 @@ function createCanvas(): HTMLCanvasElement {
 }
 
 export function updatePartyMode(videoElement: HTMLVideoElement, progressMs: number) {
+	if (!cachedSettings.partyEnabled) return
 	const audioData = getAudioData()
 	if (!audioData) return
 

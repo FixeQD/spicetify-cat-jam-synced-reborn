@@ -48,6 +48,12 @@ export const SETTINGS_SCHEMA = {
 		type: 'number',
 		default: 1.35,
 	},
+	partyEnabled: {
+		id: 'catjam-party-enabled',
+		label: 'Party Mode enabled',
+		type: 'number',
+		default: 1,
+	},
 	partyCooldownMs: {
 		id: 'catjam-party-cooldown-ms',
 		label: 'Party mode cooldown (ms)',

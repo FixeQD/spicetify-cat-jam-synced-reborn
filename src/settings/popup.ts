@@ -1,6 +1,6 @@
 import { SETTINGS_SCHEMA } from './settings'
 import { toggleDebugOverlay, isDebugVisible } from '../debug/overlay'
-import { inputControl, fileInputControl, numberControl, dropdownControl, settingsRow, settingsSection, actionBtn } from './popup-ui'
+import { inputControl, fileInputControl, numberControl, dropdownControl, toggleControl, settingsRow, settingsSection, actionBtn } from './popup-ui'
 import { openDropsEditor } from './drops-editor'
 
 declare const __APP_VERSION__: string
@@ -88,6 +88,9 @@ function buildPopup(): HTMLDivElement {
 	)
 
 	body.appendChild(settingsSection('🎉', 'Party Mode'))
+	body.appendChild(
+		settingsRow('Enabled', toggleControl(s.partyEnabled.id, String(s.partyEnabled.default)))
+	)
 	body.appendChild(
 		settingsRow(
 			'BPM threshold',
