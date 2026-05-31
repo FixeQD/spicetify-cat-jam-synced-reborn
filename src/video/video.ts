@@ -93,6 +93,12 @@ export async function createWebMVideo() {
 		videoElement.src = videoURL
 		videoElement.id = APP_CONFIG.SELECTORS.CAT_JAM_ID
 
+		videoElement.addEventListener('loadedmetadata', () => {
+			if (videoElement && isFinite(videoElement.duration) && videoElement.duration > 0) {
+				localStorage.setItem('catjam-setting:custom-duration', String(videoElement.duration))
+			}
+		})
+
 		const loopThreshold = videoDuration - 0.15
 
 		const handleTimeUpdate = () => {

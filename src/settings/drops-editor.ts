@@ -114,46 +114,31 @@ function buildEditor(): HTMLDivElement {
 	info.innerHTML = `
 		<span style="color:#a5b4fc;font-weight:600;">ℹ️ How does it work?</span><br>
 		The cat lowers its head at specific moments in the video.<br>
-		If you are using a <b>custom .webm file</b>, you need to provide:<br><br>
-		<b style="color:#c4b5fd;">1. Video duration</b> – total length of the video in seconds.<br>
-		<b style="color:#c4b5fd;">2. Drop timestamps</b> – moments (in seconds) when the cat should lower its head.<br><br>
+		If you are using a <b>custom .webm file</b>, you only need to provide<br>
+		<b style="color:#c4b5fd;">Drop timestamps</b> – moments (in seconds) when the cat should lower its head.<br><br>
 		<span style="color:rgba(255,255,255,0.45);font-size:10px;">
-			💡 How to find timestamps? Open the video in VLC or a browser,<br>
-			pause at the exact moment the cat's head drops → note the time → enter it here.<br>
+			💡 Video duration is detected automatically from the file.<br>
 			Each timestamp is a separate number, separated by a comma or a new line.
 		</span>
 	`
 	body.appendChild(info)
 
-	// --- DURATION FIELD -------------------------------------------------------
-	const durSection = document.createElement('div')
-	durSection.style.cssText = 'display: flex; flex-direction: column; gap: 5px;'
-
-	const durLabel = document.createElement('div')
-	durLabel.style.cssText = 'display: flex; justify-content: space-between; align-items: center;'
-
-	const durTitle = document.createElement('span')
-	durTitle.textContent = '⏱  Video duration (seconds)'
-	durTitle.style.cssText = 'font-size: 11px; color: rgba(255,255,255,0.6); font-weight: 600;'
-
-	const durDefault = document.createElement('span')
-	durDefault.textContent = `default: ${APP_CONFIG.VIDEO_DURATION}s`
-	durDefault.style.cssText = 'font-size: 10px; color: rgba(255,255,255,0.25);'
-
-	durLabel.append(durTitle, durDefault)
-
-	const durInput = document.createElement('input')
-	durInput.type = 'number'
-	durInput.step = '0.01'
-	durInput.min = '0.1'
-	durInput.placeholder = String(APP_CONFIG.VIDEO_DURATION)
-	durInput.value = String(getCustomDuration() ?? APP_CONFIG.VIDEO_DURATION)
-	durInput.style.cssText = baseInput + 'width: 100%; box-sizing: border-box;'
-	durInput.addEventListener('focus', () => (durInput.style.borderColor = 'rgba(165,180,252,0.5)'))
-	durInput.addEventListener('blur', () => (durInput.style.borderColor = 'rgba(255,255,255,0.1)'))
-
-	durSection.append(durLabel, durInput)
-	body.appendChild(durSection)
+	// --- AUTO-DETECTED DURATION ------------------------------------------------
+	const durDisplay = document.createElement('div')
+	durDisplay.style.cssText = `
+		background: rgba(99,102,241,0.06);
+		border: 1px solid rgba(99,102,241,0.12);
+		border-radius: 4px;
+		padding: 6px 10px;
+		font-size: 10px;
+		color: rgba(165,180,252,0.7);
+	`
+	function updateDurDisplay() {
+		const dur = getAutoDuration()
+		durDisplay.textContent = `⏱  Auto-detected video duration: ${dur.toFixed(3)}s`
+	}
+	updateDurDisplay()
+	body.appendChild(durDisplay)
 
 	// --- DROPS TEXTAREA -------------------------------------------------------
 	const dropsSection = document.createElement('div')
@@ -242,13 +227,13 @@ function buildEditor(): HTMLDivElement {
 	// Save
 	const saveBtn = makeBtn('✓ Save', 'rgba(99,102,241,0.15)', 'rgba(99,102,241,0.35)', '#a5b4fc', () => {
 		const nums = parseDrops(textarea.value)
-		const dur = Number(durInput.value)
 		if (nums.length === 0) {
 			flash(saveBtn, '⚠ No drops!')
 			return
 		}
+		const dur = getAutoDuration()
 		if (isNaN(dur) || dur <= 0) {
-			flash(saveBtn, '⚠ Invalid duration!')
+			flash(saveBtn, '⚠ Could not detect duration!')
 			return
 		}
 		localStorage.setItem(KEY_DROPS, JSON.stringify(nums))
@@ -262,7 +247,7 @@ function buildEditor(): HTMLDivElement {
 	const resetBtn = makeBtn('↩ Restore defaults', 'rgba(239,68,68,0.08)', 'rgba(239,68,68,0.18)', '#fca5a5', () => {
 		resetDropsToDefault()
 		textarea.value = APP_CONFIG.CAT_HEAD_DROPS.join(', ')
-		durInput.value = String(APP_CONFIG.VIDEO_DURATION)
+		updateDurDisplay()
 		updatePreview()
 		updateCount()
 		flash(resetBtn, '✓ Reset!')
@@ -275,6 +260,14 @@ function buildEditor(): HTMLDivElement {
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
+
+function getAutoDuration(): number {
+	const videoEl = document.getElementById(APP_CONFIG.SELECTORS.CAT_JAM_ID) as HTMLVideoElement | null
+	if (videoEl && isFinite(videoEl.duration) && videoEl.duration > 0) {
+		return videoEl.duration
+	}
+	return getCustomDuration() ?? APP_CONFIG.VIDEO_DURATION
+}
 
 function parseDrops(raw: string): number[] {
 	return raw
