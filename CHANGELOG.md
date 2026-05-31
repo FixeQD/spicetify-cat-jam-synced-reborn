@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+### v3.5.0 (Party Toggle & Auto Duration) 🎉⏱️
+
+- **Auto-detect video duration**: The drops editor no longer asks you to type the video length - it reads it straight from the webm file.
+- **Party mode toggle**: Added an on/off switch for party mode in settings. The rainbow overlay won't activate unless you want it.
+
 ### v3.4.0 (Performance & Debug Optimization) 🚀🐱
 
 - **Ultra-fast Debug Overlay**: Rewrote the debug panel to update elements directly instead of rebuilding the entire view every frame. This fixes the massive FPS drops when the overlay was open.
