@@ -140,13 +140,45 @@ export function toggleControl(id: string, def: string): HTMLElement {
 	const wrap = document.createElement('div')
 	wrap.style.cssText = 'display: flex; align-items: center; gap: 5px;'
 
-	const el = document.createElement('input')
-	el.type = 'checkbox'
-	el.checked = getSaved(id, def) === '1'
-	el.style.cssText = 'cursor: pointer; accent-color: #818cf8;'
+	const label = document.createElement('label')
+	label.style.cssText = 'position: relative; display: inline-block; width: 34px; height: 18px; cursor: pointer;'
 
-	el.addEventListener('change', () => setSaved(id, el.checked ? '1' : '0'))
-	wrap.appendChild(el)
+	const input = document.createElement('input')
+	input.type = 'checkbox'
+	input.checked = getSaved(id, def) === '1'
+	input.style.cssText = 'position: absolute; opacity: 0; width: 0; height: 0;'
+
+	const slider = document.createElement('span')
+	slider.style.cssText = `
+		position: absolute; inset: 0; cursor: pointer;
+		background: rgba(255,255,255,0.1);
+		border-radius: 18px;
+		transition: background 0.2s;
+	`
+	const knob = document.createElement('span')
+	knob.style.cssText = `
+		position: absolute; top: 2px; left: 2px;
+		width: 14px; height: 14px;
+		background: rgba(255,255,255,0.35);
+		border-radius: 50%;
+		transition: transform 0.2s, background 0.2s;
+	`
+
+	function sync() {
+		const on = input.checked
+		slider.style.background = on ? 'rgba(129,140,248,0.6)' : 'rgba(255,255,255,0.1)'
+		knob.style.transform = on ? 'translateX(16px)' : 'translateX(0)'
+		knob.style.background = on ? '#818cf8' : 'rgba(255,255,255,0.35)'
+	}
+	sync()
+
+	input.addEventListener('change', () => {
+		setSaved(id, input.checked ? '1' : '0')
+		sync()
+	})
+
+	label.append(input, slider, knob)
+	wrap.appendChild(label)
 	return wrap
 }
 
