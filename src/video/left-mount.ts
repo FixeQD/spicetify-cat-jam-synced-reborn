@@ -17,13 +17,14 @@ export function computeLeftPlacement(
 	const width = Math.min((sidebar.width * sizePercent) / 100, maxWidth)
 
 	return {
-		left: sidebar.left + (sidebar.width - width) / 2,
+		left: sidebar.left,
 		bottom: windowHeight - floorY + BOTTOM_GAP_PX,
 		width,
 	}
 }
 
 export function findLibrarySidebar(anchor: Element): HTMLElement | null {
+	let found: HTMLElement | null = null
 	for (
 		let node = anchor.parentElement;
 		node && node !== document.body;
@@ -33,9 +34,9 @@ export function findLibrarySidebar(anchor: Element): HTMLElement | null {
 		const isTall = rect.height >= window.innerHeight * MIN_SIDEBAR_HEIGHT_RATIO
 		const isOnLeft = rect.left < window.innerWidth / 2 && rect.width < window.innerWidth / 2
 		const isFullyVisible = rect.bottom <= window.innerHeight
-		if (isTall && isOnLeft && isFullyVisible) return node
+		if (isTall && isOnLeft && isFullyVisible) found = node
 	}
-	return null
+	return found
 }
 
 function findPlayerElements(): Element[] {
@@ -59,34 +60,56 @@ function findCatFloorY(sidebar: HTMLElement): number {
 	return Math.min(sidebarRect.bottom, ...playerTops)
 }
 
+export function resolveLibrarySidebar(): HTMLElement | null {
+	const anchor = document.querySelector(APP_CONFIG.SELECTORS.LEFT_LIBRARY)
+	return anchor ? findLibrarySidebar(anchor) : null
+}
+
 export function mountVideoOverSidebar(
 	video: HTMLVideoElement,
-	sidebar: HTMLElement,
+	initialSidebar: HTMLElement,
 	sizePercent: number
 ): () => void {
-	video.style.cssText = `position: fixed; height: auto; max-height: 100%; pointer-events: none; z-index: 10;`
-	document.body.appendChild(video)
+	video.style.cssText = `position: fixed; height: auto; object-fit: contain; object-position: bottom; pointer-events: none; z-index: 10;`
+
+	let sidebar: HTMLElement | null = initialSidebar
+	let frame = 0
+	let last = ''
 
 	const place = () => {
-		const { left, bottom, width } = computeLeftPlacement(
-			sidebar.getBoundingClientRect(),
-			findCatFloorY(sidebar),
-			sizePercent,
-			window.innerHeight
-		)
-		video.style.left = `${left}px`
-		video.style.bottom = `${bottom}px`
-		video.style.width = `${width}px`
+		if (!sidebar || !sidebar.isConnected) sidebar = resolveLibrarySidebar()
+
+		if (!sidebar) {
+			video.style.visibility = 'hidden'
+		} else {
+			if (!video.isConnected) document.body.appendChild(video)
+
+			const sidebarRect = sidebar.getBoundingClientRect()
+			const floorY = findCatFloorY(sidebar)
+			const { left, bottom, width } = computeLeftPlacement(
+				sidebarRect,
+				floorY,
+				sizePercent,
+				window.innerHeight
+			)
+			const maxHeight = Math.max(0, floorY - sidebarRect.top - BOTTOM_GAP_PX)
+
+			const key = `${left}|${bottom}|${width}|${maxHeight}`
+			if (key !== last) {
+				last = key
+				video.style.left = `${left}px`
+				video.style.bottom = `${bottom}px`
+				video.style.width = `${width}px`
+				video.style.maxHeight = `${maxHeight}px`
+			}
+			video.style.visibility = sidebarRect.width > 0 ? 'visible' : 'hidden'
+		}
+
+		frame = requestAnimationFrame(place)
 	}
 
+	document.body.appendChild(video)
 	place()
-	const resizeObserver = new ResizeObserver(place)
-	resizeObserver.observe(sidebar)
-	findPlayerElements().forEach((player) => resizeObserver.observe(player))
-	window.addEventListener('resize', place)
 
-	return () => {
-		resizeObserver.disconnect()
-		window.removeEventListener('resize', place)
-	}
+	return () => cancelAnimationFrame(frame)
 }
