@@ -3,9 +3,11 @@ import { cachedSettings } from '../settings/settings'
 import { getAudioData, fetchAudioData } from '../audio/audio'
 import { syncEngine } from '../sync/engine'
 import type { PerformanceLevel } from '../performance'
+import { findLibrarySidebar, mountVideoOverSidebar } from './left-mount'
 
 let videoElement: HTMLVideoElement | null = null
 let lastSyncBeatIndex = -1
+let stopTrackingSidebar: (() => void) | null = null
 
 export function getVideoElement() {
 	return videoElement
@@ -65,15 +67,17 @@ export async function createWebMVideo() {
 		const videoDuration = APP_CONFIG.VIDEO_DURATION
 
 		const sz = `${cachedSettings.catSize ?? 65}px`
-		const leftLibraryStyle = `width: ${cachedSettings.size}%; max-width: ${APP_CONFIG.STYLES.MAX_LIBRARY_WIDTH}; height: auto; max-height: 100%; position: absolute; bottom: 0; pointer-events: none; z-index: 1;`
 		const bottomStyle = `width: ${sz}; height: ${sz};`
 
 		const targetElementSelector = isBottom
 			? APP_CONFIG.SELECTORS.BOTTOM_PLAYER
 			: APP_CONFIG.SELECTORS.LEFT_LIBRARY
-		const elementStyles = isBottom ? bottomStyle : leftLibraryStyle
+		const elementStyles = isBottom ? bottomStyle : ''
 
 		const targetElement = await waitForElement(targetElementSelector)
+
+		stopTrackingSidebar?.()
+		stopTrackingSidebar = null
 
 		if (videoElement) {
 			videoElement.remove()
@@ -95,7 +99,10 @@ export async function createWebMVideo() {
 
 		videoElement.addEventListener('loadedmetadata', () => {
 			if (videoElement && isFinite(videoElement.duration) && videoElement.duration > 0) {
-				localStorage.setItem('catjam-setting:custom-duration', String(videoElement.duration))
+				localStorage.setItem(
+					'catjam-setting:custom-duration',
+					String(videoElement.duration)
+				)
 			}
 		})
 
@@ -122,10 +129,12 @@ export async function createWebMVideo() {
 		videoElement.playbackRate = 1
 		syncEngine.reset()
 
-		if (targetElement.firstChild) {
+		if (isBottom) {
 			targetElement.insertBefore(videoElement, targetElement.firstChild)
 		} else {
-			targetElement.appendChild(videoElement)
+			const sidebar = findLibrarySidebar(targetElement)
+			if (!sidebar) throw new Error('Left sidebar column not found.')
+			stopTrackingSidebar = mountVideoOverSidebar(videoElement, sidebar, cachedSettings.size)
 		}
 
 		// reset sync state

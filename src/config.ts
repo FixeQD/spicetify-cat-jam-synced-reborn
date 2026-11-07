@@ -1,7 +1,7 @@
 export const APP_CONFIG = {
 	SELECTORS: {
 		BOTTOM_PLAYER: '.main-nowPlayingBar-right',
-		LEFT_LIBRARY: '.main-yourLibraryX-libraryItemContainer',
+		LEFT_LIBRARY: '.main-yourLibraryX-libraryRootlist, .main-yourLibraryX-libraryItemContainer',
 		CAT_JAM_ID: 'catjam-webm',
 	},
 	STYLES: {
