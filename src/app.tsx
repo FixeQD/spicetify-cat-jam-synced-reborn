@@ -6,7 +6,7 @@ import { performanceMonitor, createTimedRAF } from './performance'
 import { getRateBuffer } from './sync/rate-buffer'
 import { updateDebugMetrics } from './debug/overlay'
 import { updatePartyMode } from './video/party-mode'
-import { setupSettingsTrigger } from './settings/popup'
+import { setupSettingsTrigger, openSettingsModal } from './settings/popup'
 import { createSyncWorker } from './sync/worker-factory'
 import { registerPlayerEvents } from './sync/player-events'
 
@@ -18,16 +18,18 @@ async function main() {
 
 	await createWebMVideo()
 
+	const reloadCat = async () => {
+		await createWebMVideo()
+		initSettings()
+	}
+
 	const initSettings = () => {
 		const videoEl = getVideoElement()
-		if (videoEl) {
-			setupSettingsTrigger(videoEl, async () => {
-				await createWebMVideo()
-				initSettings()
-			})
-		}
+		if (videoEl) setupSettingsTrigger(videoEl, reloadCat)
 	}
 	initSettings()
+
+	new Spicetify.Menu.Item('Cat-Jam Settings', false, () => openSettingsModal(reloadCat)).register()
 
 	let animationId: number | null = null
 	const workerRef = { worker: createSyncWorker(), ready: false }

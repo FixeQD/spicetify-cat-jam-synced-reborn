@@ -8,56 +8,7 @@ declare const __APP_VERSION__: string
 let popup: HTMLDivElement | null = null
 let onSave: (() => void) | null = null
 
-function buildPopup(): HTMLDivElement {
-	const el = document.createElement('div')
-	el.id = 'catjam-settings-popup'
-	el.style.cssText = `
-		position: fixed;
-		top: 80px;
-		right: 20px;
-		z-index: 99998;
-		width: 300px;
-		background: rgba(0,0,0,0.9);
-		border: 1px solid rgba(255,255,255,0.08);
-		border-radius: 8px;
-		box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-		backdrop-filter: blur(12px);
-		font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'SF Mono', monospace;
-		color: #e0e0e0;
-		user-select: none;
-		pointer-events: auto;
-	`
-
-	// header
-	const header = document.createElement('div')
-	header.style.cssText = `
-		padding: 8px 12px;
-		background: rgba(255,255,255,0.04);
-		border-bottom: 1px solid rgba(255,255,255,0.06);
-		border-radius: 8px 8px 0 0;
-		cursor: grab;
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-	`
-	const titleEl = document.createElement('span')
-	titleEl.textContent = 'Cat Jam Settings'
-	titleEl.style.cssText = 'font-weight: 600; color: #fff; letter-spacing: 0.5px; font-size: 11px;'
-	const right = document.createElement('div')
-	right.style.cssText = 'display: flex; align-items: center; gap: 8px;'
-	const ver = document.createElement('span')
-	ver.textContent = `v${__APP_VERSION__} - drag to move`
-	ver.style.cssText = 'font-size: 9px; color: rgba(255,255,255,0.25); letter-spacing: 0.3px;'
-	const closeBtn = document.createElement('button')
-	closeBtn.textContent = '✕'
-	closeBtn.style.cssText =
-		'background:none;border:none;color:rgba(255,255,255,0.3);font-size:12px;cursor:pointer;padding:0;line-height:1;font-family:inherit;'
-	closeBtn.addEventListener('mouseenter', () => (closeBtn.style.color = '#fff'))
-	closeBtn.addEventListener('mouseleave', () => (closeBtn.style.color = 'rgba(255,255,255,0.3)'))
-	closeBtn.addEventListener('click', closePopup)
-	right.append(ver, closeBtn)
-	header.append(titleEl, right)
-
+function buildConfigContainer(save: () => void, close: () => void): HTMLDivElement {
 	// body
 	const body = document.createElement('div')
 	body.style.cssText = 'padding: 4px 12px 12px;'
@@ -122,8 +73,8 @@ function buildPopup(): HTMLDivElement {
 	`
 
 	const saveBtn = actionBtn('Save & Reload', () => {
-		onSave?.()
-		closePopup()
+		save()
+		close()
 	})
 	saveBtn.style.flex = '1'
 
@@ -137,7 +88,68 @@ function buildPopup(): HTMLDivElement {
 	)
 
 	footer.append(saveBtn, debugBtn)
-	el.append(header, body, footer)
+	const container = document.createElement('div')
+	container.style.cssText = `
+		font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'SF Mono', monospace;
+		color: #e0e0e0;
+		user-select: none;
+	`
+	container.append(body, footer)
+	return container
+}
+
+function buildPopup(): HTMLDivElement {
+	const el = document.createElement('div')
+	el.id = 'catjam-settings-popup'
+	el.style.cssText = `
+		position: fixed;
+		top: 80px;
+		right: 20px;
+		z-index: 99998;
+		width: 300px;
+		background: rgba(0,0,0,0.9);
+		border: 1px solid rgba(255,255,255,0.08);
+		border-radius: 8px;
+		box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+		backdrop-filter: blur(12px);
+		font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'SF Mono', monospace;
+		color: #e0e0e0;
+		user-select: none;
+		pointer-events: auto;
+	`
+
+	// header
+	const header = document.createElement('div')
+	header.style.cssText = `
+		padding: 8px 12px;
+		background: rgba(255,255,255,0.04);
+		border-bottom: 1px solid rgba(255,255,255,0.06);
+		border-radius: 8px 8px 0 0;
+		cursor: grab;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+	`
+	const titleEl = document.createElement('span')
+	titleEl.textContent = 'Cat Jam Settings'
+	titleEl.style.cssText = 'font-weight: 600; color: #fff; letter-spacing: 0.5px; font-size: 11px;'
+	const right = document.createElement('div')
+	right.style.cssText = 'display: flex; align-items: center; gap: 8px;'
+	const ver = document.createElement('span')
+	ver.textContent = `v${__APP_VERSION__} - drag to move`
+	ver.style.cssText = 'font-size: 9px; color: rgba(255,255,255,0.25); letter-spacing: 0.3px;'
+	const closeBtn = document.createElement('button')
+	closeBtn.textContent = '✕'
+	closeBtn.style.cssText =
+		'background:none;border:none;color:rgba(255,255,255,0.3);font-size:12px;cursor:pointer;padding:0;line-height:1;font-family:inherit;'
+	closeBtn.addEventListener('mouseenter', () => (closeBtn.style.color = '#fff'))
+	closeBtn.addEventListener('mouseleave', () => (closeBtn.style.color = 'rgba(255,255,255,0.3)'))
+	closeBtn.addEventListener('click', closePopup)
+	right.append(ver, closeBtn)
+	header.append(titleEl, right)
+
+	const configContainer = buildConfigContainer(() => onSave?.(), closePopup)
+	el.append(header, configContainer)
 	setupDrag(el, header)
 	return el
 }
@@ -185,5 +197,12 @@ export function setupSettingsTrigger(videoElement: HTMLVideoElement, saveCallbac
 			popup = buildPopup()
 			document.body.appendChild(popup)
 		}
+	})
+}
+
+export function openSettingsModal(saveCallback: () => void) {
+	Spicetify.PopupModal.display({
+		title: 'Cat-Jam Settings',
+		content: buildConfigContainer(saveCallback, () => Spicetify.PopupModal.hide()),
 	})
 }
