@@ -3,12 +3,13 @@ import { APP_CONFIG } from '../config'
 const BOTTOM_GAP_PX = 8
 const MIN_SIDEBAR_HEIGHT_RATIO = 0.5
 
-type SidebarRect = Pick<DOMRect, 'left' | 'bottom' | 'width' | 'height'>
+type SidebarRect = Pick<DOMRect, 'left' | 'width'>
 
 type LeftPlacement = { left: number; bottom: number; width: number }
 
 export function computeLeftPlacement(
 	sidebar: SidebarRect,
+	floorY: number,
 	sizePercent: number,
 	windowHeight: number
 ): LeftPlacement {
@@ -17,7 +18,7 @@ export function computeLeftPlacement(
 
 	return {
 		left: sidebar.left + (sidebar.width - width) / 2,
-		bottom: windowHeight - sidebar.bottom + BOTTOM_GAP_PX,
+		bottom: windowHeight - floorY + BOTTOM_GAP_PX,
 		width,
 	}
 }
@@ -37,6 +38,27 @@ export function findLibrarySidebar(anchor: Element): HTMLElement | null {
 	return null
 }
 
+function findPlayerElements(): Element[] {
+	return Array.from(document.querySelectorAll(APP_CONFIG.SELECTORS.NOW_PLAYING))
+}
+
+// Some themes render the now-playing widget inside the sidebar column,
+// so the cat has to sit on top of it rather than on the column's bottom edge.
+function findCatFloorY(sidebar: HTMLElement): number {
+	const sidebarRect = sidebar.getBoundingClientRect()
+	const playerTops = findPlayerElements()
+		.map((player) => player.getBoundingClientRect())
+		.filter(
+			(rect) =>
+				rect.height > 0 &&
+				rect.left < sidebarRect.right &&
+				rect.right > sidebarRect.left &&
+				rect.top > sidebarRect.top
+		)
+		.map((rect) => rect.top)
+	return Math.min(sidebarRect.bottom, ...playerTops)
+}
+
 export function mountVideoOverSidebar(
 	video: HTMLVideoElement,
 	sidebar: HTMLElement,
@@ -48,6 +70,7 @@ export function mountVideoOverSidebar(
 	const place = () => {
 		const { left, bottom, width } = computeLeftPlacement(
 			sidebar.getBoundingClientRect(),
+			findCatFloorY(sidebar),
 			sizePercent,
 			window.innerHeight
 		)
@@ -59,6 +82,7 @@ export function mountVideoOverSidebar(
 	place()
 	const resizeObserver = new ResizeObserver(place)
 	resizeObserver.observe(sidebar)
+	findPlayerElements().forEach((player) => resizeObserver.observe(player))
 	window.addEventListener('resize', place)
 
 	return () => {

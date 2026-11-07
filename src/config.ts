@@ -3,6 +3,8 @@ export const APP_CONFIG = {
 		BOTTOM_PLAYER: '.main-nowPlayingBar-right',
 		LEFT_LIBRARY: '.main-yourLibraryX-libraryRootlist, .main-yourLibraryX-libraryItemContainer',
 		CAT_JAM_ID: 'catjam-webm',
+		NOW_PLAYING:
+			'[data-testid="now-playing-widget"], .main-nowPlayingBar-left, .Root__now-playing-bar',
 	},
 	STYLES: {
 		BOTTOM_PLAYER: 'width: 65px; height: 65px;',
