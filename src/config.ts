@@ -1,5 +1,7 @@
 export const APP_CONFIG = {
 	SELECTORS: {
+		NOW_PLAYING_BAR:
+			'.main-nowPlayingBar-container, [aria-label="Now playing bar"], [data-testid="now-playing-bar"]',
 		BOTTOM_PLAYER: '.main-nowPlayingBar-right',
 		LEFT_LIBRARY: '.main-yourLibraryX-libraryRootlist, .main-yourLibraryX-libraryItemContainer',
 		CAT_JAM_ID: 'catjam-webm',

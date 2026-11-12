@@ -48,17 +48,29 @@ export function syncTiming(startTime: number, progress: number) {
 	}
 }
 
+function findBottomPlayerTarget(): Element | null {
+	const direct = document.querySelector(APP_CONFIG.SELECTORS.BOTTOM_PLAYER)
+	if (direct) return direct
+
+	const bar = document.querySelector(APP_CONFIG.SELECTORS.NOW_PLAYING_BAR)
+	if (!bar) return null
+
+	const inner = bar.querySelector('.main-nowPlayingBar-nowPlayingBar') ?? bar
+	return inner.lastElementChild ?? inner
+}
+
 async function waitForElement(
-	selector: string,
+	find: string | (() => Element | null),
 	maxAttempts = 50,
 	interval = APP_CONFIG.DEFAULTS.SYNC_INTERVAL
 ): Promise<Element> {
+	const lookup = typeof find === 'string' ? () => document.querySelector(find) : find
 	for (let attempts = 0; attempts < maxAttempts; attempts++) {
-		const element = document.querySelector(selector)
+		const element = lookup()
 		if (element) return element
 		await new Promise((resolve) => setTimeout(resolve, interval))
 	}
-	throw new Error(`Element ${selector} not found.`)
+	throw new Error(`Element ${typeof find === 'string' ? find : 'bottom player'} not found.`)
 }
 
 export async function createWebMVideo() {
@@ -69,12 +81,11 @@ export async function createWebMVideo() {
 		const sz = `${cachedSettings.catSize ?? 65}px`
 		const bottomStyle = `width: ${sz}; height: ${sz};`
 
-		const targetElementSelector = isBottom
-			? APP_CONFIG.SELECTORS.BOTTOM_PLAYER
-			: APP_CONFIG.SELECTORS.LEFT_LIBRARY
 		const elementStyles = isBottom ? bottomStyle : ''
 
-		const targetElement = await waitForElement(targetElementSelector)
+		const targetElement = await waitForElement(
+			isBottom ? findBottomPlayerTarget : APP_CONFIG.SELECTORS.LEFT_LIBRARY
+		)
 
 		stopTrackingSidebar?.()
 		stopTrackingSidebar = null
